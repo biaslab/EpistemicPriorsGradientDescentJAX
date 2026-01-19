@@ -27,7 +27,7 @@ class PlanningConfig:
     n_optimization_steps: int = 200
     learning_rate: float = 0.1
     verbose: bool = False
-    marginal_inference: bool = False
+    inference_mode: str = "marginal"
 
 
 @dataclass 
@@ -76,7 +76,7 @@ def plan_actions(
             goal_mapping=goal_mapping,
             action_prior=action_prior,
             horizon=config.planning_horizon,
-            marginal_inference=config.marginal_inference,
+            inference_mode=config.inference_mode,
         )
     
     @jax.jit

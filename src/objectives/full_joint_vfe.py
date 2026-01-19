@@ -94,6 +94,46 @@ def conditional_entropy_3d(marginal: Array) -> Array:
     # H[obs | reward, state] = H[obs, reward | state] - H[reward | state]
     return joint_entropies - marginal_entropies
 
+def compute_planning_entropy_correction(
+    q_xu: Array,
+    state_sequences: Array,
+    action_sequences: Array,
+    n_states: int,
+    n_actions: int,
+    horizon: int,
+) -> Array:
+    """
+    Compute ∑_{t=1}^T H[q(x_{t-1}, u_t)] - H[q(x_{t-1})].
+    """
+    correction = 0.0
+    
+    # t=1: x_0 is deterministic (H[x_0] = 0), so contribution = H[u_1]
+    first_actions = action_sequences[:, 0]
+    action_one_hot = jax.nn.one_hot(first_actions, n_actions)
+    q_u_seqs = jnp.sum(q_xu, axis=0)
+    q_u1 = action_one_hot.T @ q_u_seqs
+    h_u1 = -jnp.sum(q_u1 * jnp.log(q_u1 + EPS))
+    correction = h_u1
+    
+    # t=2 to T
+    for t in range(2, horizon + 1):
+        states_tm1 = state_sequences[:, t - 2]
+        actions_t = action_sequences[:, t - 1]
+        
+        state_one_hot = jax.nn.one_hot(states_tm1, n_states)
+        action_one_hot = jax.nn.one_hot(actions_t, n_actions)
+        
+        q_joint = state_one_hot.T @ q_xu @ action_one_hot
+        h_joint = -jnp.sum(q_joint * jnp.log(q_joint + EPS))
+        
+        q_marginal = jnp.sum(q_joint, axis=1)
+        h_marginal = -jnp.sum(q_marginal * jnp.log(q_marginal + EPS))
+        
+        correction = correction + h_joint - h_marginal
+    
+    return correction
+
+
 def full_joint_vfe(
     q_logits: Array,
     initial_state: Array,
@@ -102,7 +142,7 @@ def full_joint_vfe(
     goal_mapping: Array,
     action_prior: Array,
     horizon: int,
-    marginal_inference: bool = False,
+    inference_mode: str = "marginal",
 ) -> Array:
     """
     Compute vanilla VFE with full joint q(x_{1:T}, u_{1:T}, r).
@@ -115,7 +155,7 @@ def full_joint_vfe(
         goal_mapping: p(goal|x,r), shape (n_states, n_reward_locs)
         action_prior: Action prior, shape (n_actions,)
         horizon: Planning horizon T
-        marginal_inference: If True, skip epistemic state energy term
+        inference_mode: "marginal", "active", or "planning"
         
     Returns:
         Scalar VFE loss.
@@ -158,12 +198,13 @@ def full_joint_vfe(
     log_goal_per_xr = log_goal[final_states, :]
     goal_energy = -jnp.sum(q_xr * log_goal_per_xr)
 
-    # Epistemic terms: state and control priors based on information gain
-    if marginal_inference:
-        state_energy = 0.0
-        control_energy = 0.0
-    else:
-        # State energy: E_q[-log p(x)] - prefer states with informative observations
+    # Epistemic terms based on inference mode
+    state_energy = 0.0
+    control_energy = 0.0
+    planning_correction = 0.0
+    
+    if inference_mode == "active":
+        # State energy: E_q[-log p̃(x)] ∝ exp(-H[q(y|x)]) - prefer states with informative observations
         prior_state = softmax(-conditional_entropy_3d(observation_tensor))
         log_state_prior = jnp.log(prior_state + EPS)
         log_prior_per_state_seq = jnp.sum(log_state_prior[state_sequences], axis=1)
@@ -203,11 +244,16 @@ def full_joint_vfe(
         log_prior_per_action_seq = jnp.sum(log_control_prior[action_sequences], axis=1)
         control_energy = -jnp.sum(q_u * log_prior_per_action_seq)
     
+    elif inference_mode == "planning":
+        planning_correction = compute_planning_entropy_correction(
+            q_xu, state_sequences, action_sequences, n_states, n_actions, horizon
+        )
+    
     # Reward prior energy: E_q[-log p(r)]
     reward_prior = jnp.ones(n_reward_locs) / n_reward_locs
     reward_energy = -jnp.sum(q_r * jnp.log(reward_prior + EPS))
     
-    return neg_entropy + action_energy + transition_energy + goal_energy + reward_energy + state_energy + control_energy
+    return neg_entropy + action_energy + transition_energy + goal_energy + reward_energy + state_energy + control_energy + planning_correction
 
 
 def extract_first_action_marginal(

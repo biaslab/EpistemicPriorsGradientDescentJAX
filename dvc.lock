@@ -1,0 +1,140 @@
+schema: '2.0'
+stages:
+  experiment_marginal:
+    cmd: python scripts/tmaze_experiment.py --inference-mode marginal 
+      --output-dir data/marginal
+    deps:
+    - path: scripts/tmaze_experiment.py
+      hash: md5
+      md5: 7ff3e2d836a93e3e9e9cb74514c695ab
+      size: 12004
+    - path: src/environments/tmaze.py
+      hash: md5
+      md5: 670be81fdc8cd2ebe49ae5263ef479d3
+      size: 9919
+    - path: src/objectives/full_joint_vfe.py
+      hash: md5
+      md5: e9630794890a39a864cf40c8fe72b23a
+      size: 11049
+    - path: src/planning/full_joint_optimizer.py
+      hash: md5
+      md5: 33753e1b7ae9fe68114d4e1c34c63cc2
+      size: 3764
+    - path: src/visualization/tmaze_viz.py
+      hash: md5
+      md5: 7662cc9091da0c6511610686d77f0e5a
+      size: 8119
+    params:
+      params.yaml:
+        experiment.learning_rate: 0.1
+        experiment.max_steps: 4
+        experiment.n_episodes: 50
+        experiment.n_optimization_steps: 100
+        experiment.planning_horizon: 4
+        experiment.receding_horizon: true
+        experiment.seed: 42
+    outs:
+    - path: data/marginal/episode.mp4
+      hash: md5
+      md5: 0872554b43a471f879eff717bccbdc1a
+      size: 9302
+    - path: data/marginal/results.json
+      hash: md5
+      md5: 3c5dda101e8bb63f0ca8f64af1199047
+      size: 15578
+    - path: data/marginal/stats.json
+      hash: md5
+      md5: 2d8281f3a2dc5182246dc216d39db28b
+      size: 180
+  experiment_active:
+    cmd: python scripts/tmaze_experiment.py --inference-mode active --output-dir
+      data/active
+    deps:
+    - path: scripts/tmaze_experiment.py
+      hash: md5
+      md5: 7ff3e2d836a93e3e9e9cb74514c695ab
+      size: 12004
+    - path: src/environments/tmaze.py
+      hash: md5
+      md5: 670be81fdc8cd2ebe49ae5263ef479d3
+      size: 9919
+    - path: src/objectives/full_joint_vfe.py
+      hash: md5
+      md5: e9630794890a39a864cf40c8fe72b23a
+      size: 11049
+    - path: src/planning/full_joint_optimizer.py
+      hash: md5
+      md5: 33753e1b7ae9fe68114d4e1c34c63cc2
+      size: 3764
+    - path: src/visualization/tmaze_viz.py
+      hash: md5
+      md5: 7662cc9091da0c6511610686d77f0e5a
+      size: 8119
+    params:
+      params.yaml:
+        experiment.learning_rate: 0.1
+        experiment.max_steps: 4
+        experiment.n_episodes: 50
+        experiment.n_optimization_steps: 100
+        experiment.planning_horizon: 4
+        experiment.receding_horizon: true
+        experiment.seed: 42
+    outs:
+    - path: data/active/episode.mp4
+      hash: md5
+      md5: 51ca660ec02e12ea16a1f20ef802e325
+      size: 10497
+    - path: data/active/results.json
+      hash: md5
+      md5: 3b9bdeed2036cfedac1e9f93ab744c91
+      size: 15508
+    - path: data/active/stats.json
+      hash: md5
+      md5: acf731af46849fc602512eb1a777d3d3
+      size: 176
+  experiment_planning:
+    cmd: python scripts/tmaze_experiment.py --inference-mode planning 
+      --output-dir data/planning
+    deps:
+    - path: scripts/tmaze_experiment.py
+      hash: md5
+      md5: 7ff3e2d836a93e3e9e9cb74514c695ab
+      size: 12004
+    - path: src/environments/tmaze.py
+      hash: md5
+      md5: 670be81fdc8cd2ebe49ae5263ef479d3
+      size: 9919
+    - path: src/objectives/full_joint_vfe.py
+      hash: md5
+      md5: e9630794890a39a864cf40c8fe72b23a
+      size: 11049
+    - path: src/planning/full_joint_optimizer.py
+      hash: md5
+      md5: 33753e1b7ae9fe68114d4e1c34c63cc2
+      size: 3764
+    - path: src/visualization/tmaze_viz.py
+      hash: md5
+      md5: 7662cc9091da0c6511610686d77f0e5a
+      size: 8119
+    params:
+      params.yaml:
+        experiment.learning_rate: 0.1
+        experiment.max_steps: 4
+        experiment.n_episodes: 50
+        experiment.n_optimization_steps: 100
+        experiment.planning_horizon: 4
+        experiment.receding_horizon: true
+        experiment.seed: 42
+    outs:
+    - path: data/planning/episode.mp4
+      hash: md5
+      md5: f17ebb8808a5e709fc048f1b955ead1b
+      size: 8464
+    - path: data/planning/results.json
+      hash: md5
+      md5: 7278f0bbb23cb19f79f980373465affd
+      size: 13378
+    - path: data/planning/stats.json
+      hash: md5
+      md5: f4c6d8ceb4dda36894f29538ac037e2b
+      size: 180

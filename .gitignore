@@ -33,5 +33,12 @@ htmlcov/
 # Jupyter
 .ipynb_checkpoints/
 
-data/
+# DVC outputs (tracked by DVC, not git)
+/data/
+
+# DVC cache and local config
+/.dvc/cache
+/.dvc/tmp
+/.dvc/config.local
+
 uv.lock
