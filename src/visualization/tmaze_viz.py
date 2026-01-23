@@ -68,9 +68,9 @@ ACTION_DIRECTIONS = {
 VALID_ACTIONS = {
     0: [0],           # From CUE: can only go North
     1: [0, 2],        # From MIDDLE: North or South
-    2: [1],           # From TOP_LEFT: can only go East
+    2: [],            # From TOP_LEFT: sink state (no valid actions)
     3: [1, 3],        # From TOP_MIDDLE: East or West
-    4: [3],           # From TOP_RIGHT: can only go West
+    4: [],            # From TOP_RIGHT: sink state (no valid actions)
 }
 
 
@@ -126,23 +126,6 @@ def get_tikz_color_definitions() -> str:
 \definecolor{pairedpurple}{HTML}{CAB2D6}"""
 
 
-def _sigmoid_alpha(prob: float, threshold: float = 0.3, steepness: float = 12.0) -> float:
-    """
-    Convert probability to alpha using sigmoid function.
-    
-    Low probabilities -> nearly invisible (alpha ~ 0)
-    High probabilities -> very visible (alpha ~ 1)
-    
-    Args:
-        prob: Combined probability (state_prob * action_prob)
-        threshold: Probability at which alpha = 0.5
-        steepness: How sharp the transition is (higher = sharper)
-    """
-    import math
-    # Sigmoid: 1 / (1 + exp(-k * (x - threshold)))
-    return 1.0 / (1.0 + math.exp(-steepness * (prob - threshold)))
-
-
 def _draw_plan_arrows_mpl(
     ax: plt.Axes,
     plan_data: PlanData,
@@ -194,8 +177,7 @@ def _draw_plan_arrows_mpl(
                 combined_prob = state_prob * action_prob
                 
                 # Sigmoid alpha: low probs -> invisible, high probs -> very visible
-                alpha = _sigmoid_alpha(combined_prob)
-                alpha = max(0.05, min(0.95, alpha))  # Small clamp for safety
+                alpha = combined_prob
                 
                 dx, dy = ACTION_DIRECTIONS[action_idx]
                 
@@ -495,8 +477,7 @@ def _generate_tikz_plan_arrows(
                 combined_prob = state_prob * action_prob
                 
                 # Sigmoid alpha: low probs -> invisible, high probs -> very visible
-                alpha = _sigmoid_alpha(combined_prob)
-                alpha = max(0.05, min(0.95, alpha))
+                alpha = combined_prob
                 
                 dx, dy = ACTION_DIRECTIONS[action_idx]
                 end_x, end_y = x + dx, y + dy
