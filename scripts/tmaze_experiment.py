@@ -7,7 +7,7 @@ Vanilla VFE: minimize E_q[log q] - E_q[log p] with a goal prior.
 
 import argparse
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime
 from typing import List, Tuple, Optional
 import random
@@ -24,7 +24,13 @@ sys.path.insert(0, str(script_dir))
 
 from src.environments import TMaze, create_tmaze_tensors
 from src.planning import plan_actions, select_action, PlanningConfig
-from src.visualization import plot_tmaze_frame, create_episode_video
+from src.visualization import (
+    plot_tmaze_frame,
+    create_episode_video,
+    save_episode_tikz_frames,
+    save_tmaze_reference,
+    PlanData,
+)
 
 
 @dataclass
@@ -42,6 +48,13 @@ class ExperimentConfig:
 
 
 @dataclass
+class PlanningSnapshot:
+    """Snapshot of planning state at a single time step."""
+    all_action_probs: List[List[float]]  # (horizon, n_actions) - q(u_t) for all future t
+    all_state_probs: List[List[float]]   # (horizon, n_states) - q(x_t) for all future t
+
+
+@dataclass
 class EpisodeResult:
     """Result from a single episode."""
     total_reward: float
@@ -51,6 +64,7 @@ class EpisodeResult:
     actions: List[int]
     final_state: int
     reward_location: str = ""  # 'left' or 'right'
+    planning_history: Optional[List[PlanningSnapshot]] = None  # Planning snapshots at each step
 
 
 def run_episode(
@@ -59,11 +73,13 @@ def run_episode(
     observation_tensor: Array,
     goal_mapping: Array,
     config: ExperimentConfig,
+    record_planning: bool = False,
 ) -> EpisodeResult:
     """Run a single episode in the T-maze."""
     total_reward = 0.0
     trajectory = [env.agent_state]
     actions = []
+    planning_history = [] if record_planning else None
     
     for step in range(config.max_steps):
         time_remaining = config.max_steps - step
@@ -107,6 +123,14 @@ def run_episode(
         action = select_action(result)
         actions.append(action)
         
+        # Record planning snapshot for visualization
+        if record_planning:
+            snapshot = PlanningSnapshot(
+                all_action_probs=result.all_action_probs.tolist(),
+                all_state_probs=result.all_state_probs.tolist(),
+            )
+            planning_history.append(snapshot)
+        
         if config.verbose:
             print(f"  Step {step}: State={env.agent_state}, Action={action}, horizon={effective_horizon}")
             print(f"    q(u1)={result.first_action_probs}")
@@ -127,10 +151,14 @@ def run_episode(
         actions=actions,
         final_state=env.agent_state,
         reward_location=env.reward_location,
+        planning_history=planning_history,
     )
 
 
-def run_experiment(config: ExperimentConfig) -> Tuple[float, float, List[EpisodeResult]]:
+def run_experiment(
+    config: ExperimentConfig,
+    record_planning_for_last: bool = False,
+) -> Tuple[float, float, List[EpisodeResult]]:
     """Run the full T-maze experiment."""
     random.seed(config.seed)
     
@@ -144,12 +172,17 @@ def run_experiment(config: ExperimentConfig) -> Tuple[float, float, List[Episode
         if config.verbose:
             print(f"\nEpisode {episode + 1}: Reward at {env.reward_location}")
         
+        # Record planning for last episode if requested (for visualization)
+        is_last_episode = (episode == config.n_episodes - 1)
+        record_planning = record_planning_for_last and is_last_episode
+        
         result = run_episode(
             env=env,
             transition_tensor=transition_tensor,
             observation_tensor=observation_tensor,
             goal_mapping=goal_mapping,
             config=config,
+            record_planning=record_planning,
         )
         results.append(result)
         
@@ -226,14 +259,36 @@ def save_results(
     return json_path
 
 
+def _convert_planning_history_to_plan_data(
+    planning_history: Optional[List[PlanningSnapshot]],
+) -> Optional[List[PlanData]]:
+    """Convert PlanningSnapshot list to PlanData list for visualization."""
+    if planning_history is None:
+        return None
+    
+    return [
+        PlanData(
+            all_action_probs=snapshot.all_action_probs,
+            all_state_probs=snapshot.all_state_probs,
+        )
+        for snapshot in planning_history
+    ]
+
+
 def create_last_episode_video(
     result: EpisodeResult,
     output_dir: Path,
     inference_type: str,
+    show_plan_arrows: bool = False,
 ) -> Path:
     """Create a video of the last episode."""
     # Fixed filename for DVC
     video_path = output_dir / "episode.mp4"
+    
+    # Convert planning history if showing plan arrows
+    planning_history = None
+    if show_plan_arrows and result.planning_history:
+        planning_history = _convert_planning_history_to_plan_data(result.planning_history)
     
     create_episode_video(
         trajectory=result.trajectory,
@@ -241,9 +296,34 @@ def create_last_episode_video(
         reward_location=result.reward_location,
         output_path=video_path,
         fps=2,
+        planning_history=planning_history,
     )
     
     return video_path
+
+
+def create_last_episode_tikz_frames(
+    result: EpisodeResult,
+    output_dir: Path,
+    show_plan_arrows: bool = False,
+) -> Path:
+    """Create TikZ frames of the last episode for LaTeX papers."""
+    frames_dir = output_dir / "frames"
+    
+    # Convert planning history if showing plan arrows
+    planning_history = None
+    if show_plan_arrows and result.planning_history:
+        planning_history = _convert_planning_history_to_plan_data(result.planning_history)
+    
+    save_episode_tikz_frames(
+        trajectory=result.trajectory,
+        actions=result.actions,
+        reward_location=result.reward_location,
+        output_dir=frames_dir,
+        planning_history=planning_history,
+    )
+    
+    return frames_dir
 
 
 def load_params_from_yaml(params_path: Path) -> dict:
@@ -272,6 +352,10 @@ def main():
                         help="Output directory for results and videos")
     parser.add_argument("--no-video", action="store_true",
                         help="Skip video generation")
+    parser.add_argument("--no-tikz", action="store_true",
+                        help="Skip TikZ frame generation")
+    parser.add_argument("--show-plan-arrows", action="store_true",
+                        help="Show plan arrows in video and TikZ frames")
     
     args = parser.parse_args()
     
@@ -315,7 +399,11 @@ def main():
     print(f"Optimization steps: {config.n_optimization_steps}")
     print("=" * 60)
     
-    mean_reward, success_rate, results = run_experiment(config)
+    # Record planning for last episode if showing plan arrows
+    mean_reward, success_rate, results = run_experiment(
+        config,
+        record_planning_for_last=args.show_plan_arrows,
+    )
     
     print("\nRESULTS")
     print("=" * 60)
@@ -338,11 +426,28 @@ def main():
     if not args.no_video and results:
         inference_tag = config.inference_mode
         try:
-            video_path = create_last_episode_video(results[-1], output_dir, inference_tag)
+            video_path = create_last_episode_video(
+                results[-1], output_dir, inference_tag,
+                show_plan_arrows=args.show_plan_arrows,
+            )
             print(f"Video saved to: {video_path}")
         except ImportError as e:
             print(f"Warning: Could not create video - {e}")
             print("Install imageio with: pip install imageio[ffmpeg]")
+    
+    # Create TikZ frames for LaTeX papers
+    if not args.no_tikz and results:
+        frames_dir = create_last_episode_tikz_frames(
+            results[-1], output_dir,
+            show_plan_arrows=args.show_plan_arrows,
+        )
+        print(f"TikZ frames saved to: {frames_dir}")
+        
+        # Save reference T-maze figure with legend (only once in data/)
+        data_dir = output_dir.parent if output_dir.name in ['marginal', 'active', 'planning'] else output_dir
+        tmaze_ref_path = data_dir / "tmaze.tex"
+        if not tmaze_ref_path.exists():
+            save_tmaze_reference(tmaze_ref_path)
 
 
 if __name__ == "__main__":

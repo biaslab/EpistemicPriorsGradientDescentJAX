@@ -294,3 +294,71 @@ def extract_reward_location_marginal(
     
     q_xur = softmax(q_logits.flatten()).reshape((n_state_seqs, n_action_seqs, n_reward_locs))
     return jnp.sum(q_xur, axis=(0, 1))
+
+
+def extract_all_action_marginals(
+    q_logits: Array,
+    n_states: int,
+    n_actions: int,
+    horizon: int,
+) -> Array:
+    """
+    Extract q(u_t) for all t = 1, ..., T from q(x_{1:T}, u_{1:T}, r).
+    
+    Returns:
+        Array of shape (horizon, n_actions) where [t, a] = q(u_{t+1} = a).
+    """
+    n_state_seqs = n_states ** horizon
+    n_action_seqs = n_actions ** horizon
+    n_reward_locs = q_logits.shape[2]
+    
+    q_xur = softmax(q_logits.flatten()).reshape((n_state_seqs, n_action_seqs, n_reward_locs))
+    q_u = jnp.sum(q_xur, axis=(0, 2))  # (n_action_seqs,)
+    
+    action_sequences = enumerate_action_sequences(n_actions, horizon)
+    
+    # Extract marginal for each time step
+    all_marginals = []
+    for t in range(horizon):
+        actions_t = action_sequences[:, t]
+        q_action_t = jnp.zeros(n_actions)
+        for a in range(n_actions):
+            mask = (actions_t == a).astype(jnp.float32)
+            q_action_t = q_action_t.at[a].set(jnp.sum(q_u * mask))
+        all_marginals.append(q_action_t)
+    
+    return jnp.stack(all_marginals, axis=0)
+
+
+def extract_all_state_marginals(
+    q_logits: Array,
+    n_states: int,
+    n_actions: int,
+    horizon: int,
+) -> Array:
+    """
+    Extract q(x_t) for all t = 1, ..., T from q(x_{1:T}, u_{1:T}, r).
+    
+    Returns:
+        Array of shape (horizon, n_states) where [t, s] = q(x_{t+1} = s).
+    """
+    n_state_seqs = n_states ** horizon
+    n_action_seqs = n_actions ** horizon
+    n_reward_locs = q_logits.shape[2]
+    
+    q_xur = softmax(q_logits.flatten()).reshape((n_state_seqs, n_action_seqs, n_reward_locs))
+    q_x = jnp.sum(q_xur, axis=(1, 2))  # (n_state_seqs,)
+    
+    state_sequences = enumerate_state_sequences(n_states, horizon)
+    
+    # Extract marginal for each time step
+    all_marginals = []
+    for t in range(horizon):
+        states_t = state_sequences[:, t]
+        q_state_t = jnp.zeros(n_states)
+        for s in range(n_states):
+            mask = (states_t == s).astype(jnp.float32)
+            q_state_t = q_state_t.at[s].set(jnp.sum(q_x * mask))
+        all_marginals.append(q_state_t)
+    
+    return jnp.stack(all_marginals, axis=0)

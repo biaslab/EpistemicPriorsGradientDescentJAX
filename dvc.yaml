@@ -1,6 +1,6 @@
 stages:
   experiment_marginal:
-    cmd: python scripts/tmaze_experiment.py --inference-mode marginal --output-dir data/marginal
+    cmd: uv run python scripts/tmaze_experiment.py --inference-mode marginal --output-dir data/marginal --show-plan-arrows --planning-horizon 4
     params:
       - experiment.n_episodes
       - experiment.max_steps
@@ -19,9 +19,10 @@ stages:
       - data/marginal/results.json
       - data/marginal/stats.json
       - data/marginal/episode.mp4
+      - data/marginal/frames
 
   experiment_active:
-    cmd: python scripts/tmaze_experiment.py --inference-mode active --output-dir data/active
+    cmd: uv run python scripts/tmaze_experiment.py --inference-mode active --output-dir data/active --show-plan-arrows --planning-horizon 4
     params:
       - experiment.n_episodes
       - experiment.max_steps
@@ -40,9 +41,10 @@ stages:
       - data/active/results.json
       - data/active/stats.json
       - data/active/episode.mp4
+      - data/active/frames
 
   experiment_planning:
-    cmd: python scripts/tmaze_experiment.py --inference-mode planning --output-dir data/planning
+    cmd: uv run python scripts/tmaze_experiment.py --inference-mode planning --output-dir data/planning --show-plan-arrows --planning-horizon 4
     params:
       - experiment.n_episodes
       - experiment.max_steps
@@ -61,3 +63,4 @@ stages:
       - data/planning/results.json
       - data/planning/stats.json
       - data/planning/episode.mp4
+      - data/planning/frames

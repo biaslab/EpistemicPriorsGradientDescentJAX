@@ -13,6 +13,8 @@ from ..objectives.full_joint_vfe import (
     full_joint_vfe,
     extract_first_action_marginal,
     extract_reward_location_marginal,
+    extract_all_action_marginals,
+    extract_all_state_marginals,
     enumerate_state_sequences,
 )
 
@@ -36,6 +38,8 @@ class PlanningResult:
     q_xur: Array                 # q(x, u, r)
     first_action_probs: Array    # q(u_1)
     reward_location_probs: Array # q(r)
+    all_action_probs: Array      # q(u_t) for all t, shape (horizon, n_actions)
+    all_state_probs: Array       # q(x_t) for all t, shape (horizon, n_states)
     final_loss: float
     loss_history: List[float]
 
@@ -105,11 +109,19 @@ def plan_actions(
     reward_location_probs = extract_reward_location_marginal(
         params['q_logits'], config.n_states, config.n_actions, config.planning_horizon
     )
+    all_action_probs = extract_all_action_marginals(
+        params['q_logits'], config.n_states, config.n_actions, config.planning_horizon
+    )
+    all_state_probs = extract_all_state_marginals(
+        params['q_logits'], config.n_states, config.n_actions, config.planning_horizon
+    )
     
     return PlanningResult(
         q_xur=q_xur,
         first_action_probs=first_action_probs,
         reward_location_probs=reward_location_probs,
+        all_action_probs=all_action_probs,
+        all_state_probs=all_state_probs,
         final_loss=loss_history[-1],
         loss_history=loss_history,
     )
