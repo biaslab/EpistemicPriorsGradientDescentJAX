@@ -15,6 +15,7 @@ import random
 import jax.numpy as jnp
 from jax import Array
 import yaml
+from tqdm import tqdm
 
 from pathlib import Path
 import sys
@@ -167,7 +168,7 @@ def run_experiment(
     
     results = []
     
-    for episode in range(config.n_episodes):
+    for episode in tqdm(range(config.n_episodes), desc="Episodes", disable=config.verbose):
         env = TMaze.create(reward_location=None, start_state=1)
         
         if config.verbose:
