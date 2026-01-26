@@ -721,6 +721,10 @@ def save_episode_tikz_frames(
     """
     Save TikZ frames for an episode's trajectory.
     
+    When planning_history is provided, saves BOTH versions for each frame:
+    - frame_XX.tex: without planning arrows
+    - frame_XX_arrows.tex: with planning arrows
+    
     Args:
         trajectory: List of states visited (including initial state).
         actions: List of actions taken.
@@ -747,31 +751,12 @@ def save_episode_tikz_frames(
         f.write("\n")
     saved_paths.append(colors_path)
     
-    # First frame: initial state (no action yet)
-    has_seen_cue = trajectory[0] == 0
-    plan_data = planning_history[0] if planning_history else None
-    tikz_code = generate_tikz_frame(
-        agent_state=trajectory[0],
-        reward_location=reward_location,
-        has_seen_cue=has_seen_cue,
-        theme=theme,
-        step=0,
-        action=None,
-        standalone=standalone,
-        plan_data=plan_data,
-    )
-    
-    frame_path = output_dir / "frame_00.tex"
-    with open(frame_path, 'w') as f:
-        f.write(tikz_code)
-    saved_paths.append(frame_path)
-    
-    # Subsequent frames: after each action
-    for step, (state, action) in enumerate(zip(trajectory[1:], actions), start=1):
-        has_seen_cue = any(s == 0 for s in trajectory[:step+1])
-        plan_data = planning_history[step] if planning_history and step < len(planning_history) else None
+    def save_frame(step: int, state: int, action: Optional[int], has_seen_cue: bool, plan_data: Optional[PlanData]):
+        """Helper to save a single frame (with and without arrows if plan_data provided)."""
+        paths = []
         
-        tikz_code = generate_tikz_frame(
+        # Always save version WITHOUT arrows
+        tikz_code_no_arrows = generate_tikz_frame(
             agent_state=state,
             reward_location=reward_location,
             has_seen_cue=has_seen_cue,
@@ -779,13 +764,44 @@ def save_episode_tikz_frames(
             step=step,
             action=action,
             standalone=standalone,
-            plan_data=plan_data,
+            plan_data=None,  # No arrows
         )
         
         frame_path = output_dir / f"frame_{step:02d}.tex"
         with open(frame_path, 'w') as f:
-            f.write(tikz_code)
-        saved_paths.append(frame_path)
+            f.write(tikz_code_no_arrows)
+        paths.append(frame_path)
+        
+        # If planning history available, also save version WITH arrows
+        if plan_data is not None:
+            tikz_code_with_arrows = generate_tikz_frame(
+                agent_state=state,
+                reward_location=reward_location,
+                has_seen_cue=has_seen_cue,
+                theme=theme,
+                step=step,
+                action=action,
+                standalone=standalone,
+                plan_data=plan_data,  # With arrows
+            )
+            
+            frame_path_arrows = output_dir / f"frame_{step:02d}_arrows.tex"
+            with open(frame_path_arrows, 'w') as f:
+                f.write(tikz_code_with_arrows)
+            paths.append(frame_path_arrows)
+        
+        return paths
+    
+    # First frame: initial state (no action yet)
+    has_seen_cue = trajectory[0] == 0
+    plan_data = planning_history[0] if planning_history else None
+    saved_paths.extend(save_frame(0, trajectory[0], None, has_seen_cue, plan_data))
+    
+    # Subsequent frames: after each action
+    for step, (state, action) in enumerate(zip(trajectory[1:], actions), start=1):
+        has_seen_cue = any(s == 0 for s in trajectory[:step+1])
+        plan_data = planning_history[step] if planning_history and step < len(planning_history) else None
+        saved_paths.extend(save_frame(step, state, action, has_seen_cue, plan_data))
     
     print(f"TikZ frames saved to: {output_dir}")
     return saved_paths

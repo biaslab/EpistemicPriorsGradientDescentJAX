@@ -280,16 +280,11 @@ def create_last_episode_video(
     result: EpisodeResult,
     output_dir: Path,
     inference_type: str,
-    show_plan_arrows: bool = False,
 ) -> Path:
     """Create a video of the last episode."""
-    # Fixed filename for DVC
     video_path = output_dir / "episode.mp4"
     
-    # Convert planning history if showing plan arrows
-    planning_history = None
-    if show_plan_arrows and result.planning_history:
-        planning_history = _convert_planning_history_to_plan_data(result.planning_history)
+    planning_history = _convert_planning_history_to_plan_data(result.planning_history)
     
     create_episode_video(
         trajectory=result.trajectory,
@@ -306,15 +301,14 @@ def create_last_episode_video(
 def create_last_episode_tikz_frames(
     result: EpisodeResult,
     output_dir: Path,
-    show_plan_arrows: bool = False,
 ) -> Path:
-    """Create TikZ frames of the last episode for LaTeX papers."""
+    """Create TikZ frames of the last episode for LaTeX papers.
+    
+    Saves both versions: frame_XX.tex (no arrows) and frame_XX_arrows.tex (with arrows).
+    """
     frames_dir = output_dir / "frames"
     
-    # Convert planning history if showing plan arrows
-    planning_history = None
-    if show_plan_arrows and result.planning_history:
-        planning_history = _convert_planning_history_to_plan_data(result.planning_history)
+    planning_history = _convert_planning_history_to_plan_data(result.planning_history)
     
     save_episode_tikz_frames(
         trajectory=result.trajectory,
@@ -355,8 +349,6 @@ def main():
                         help="Skip video generation")
     parser.add_argument("--no-tikz", action="store_true",
                         help="Skip TikZ frame generation")
-    parser.add_argument("--show-plan-arrows", action="store_true",
-                        help="Show plan arrows in video and TikZ frames")
     
     args = parser.parse_args()
     
@@ -400,10 +392,10 @@ def main():
     print(f"Optimization steps: {config.n_optimization_steps}")
     print("=" * 60)
     
-    # Record planning for last episode if showing plan arrows
+    # Always record planning for last episode (for visualization)
     mean_reward, success_rate, results = run_experiment(
         config,
-        record_planning_for_last=args.show_plan_arrows,
+        record_planning_for_last=True,
     )
     
     print("\nRESULTS")
@@ -429,18 +421,16 @@ def main():
         try:
             video_path = create_last_episode_video(
                 results[-1], output_dir, inference_tag,
-                show_plan_arrows=args.show_plan_arrows,
             )
             print(f"Video saved to: {video_path}")
         except ImportError as e:
             print(f"Warning: Could not create video - {e}")
             print("Install imageio with: pip install imageio[ffmpeg]")
     
-    # Create TikZ frames for LaTeX papers
+    # Create TikZ frames for LaTeX papers (both with and without arrows)
     if not args.no_tikz and results:
         frames_dir = create_last_episode_tikz_frames(
             results[-1], output_dir,
-            show_plan_arrows=args.show_plan_arrows,
         )
         print(f"TikZ frames saved to: {frames_dir}")
         
