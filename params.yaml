@@ -4,6 +4,6 @@ experiment:
   max_steps: 4
   planning_horizon: 4
   receding_horizon: true
-  n_optimization_steps: 100
+  n_optimization_steps: 120
   learning_rate: 0.1
   seed: 42

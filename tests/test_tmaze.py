@@ -106,6 +106,10 @@ class TestPlanning:
         
         config = PlanningConfig(
             planning_horizon=2,
+            n_obs=2,
+            n_states=5,
+            n_actions=4,
+            n_theta=2,
             n_optimization_steps=10,
         )
         
@@ -133,8 +137,12 @@ class TestPlanning:
         
         config = PlanningConfig(
             planning_horizon=4,
+            n_obs=2,
+            n_states=5,
+            n_actions=4,
+            n_theta=2,
             n_optimization_steps=50,
-            include_epistemic=False,  # Disable epistemic terms for direct goal-seeking
+            inference_mode="marginal",  # Use marginal inference for direct goal-seeking
         )
         
         # Agent at middle, knows reward is on left
