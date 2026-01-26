@@ -18,6 +18,7 @@ from enum import IntEnum
 from typing import Tuple
 import random
 
+import jax
 import jax.numpy as jnp
 from jax import Array
 
@@ -243,13 +244,16 @@ def create_tmaze_tensors() -> Tuple[Array, Array, Array]:
     reward_obs = reward_obs.at[:, 0, 0].set(jnp.array([1.0, 0.0]))  # Left reward -> left cue
     reward_obs = reward_obs.at[:, 0, 1].set(jnp.array([0.0, 1.0]))  # Right reward -> right cue
     
-    # Goal mapping: p(goal | state, reward_loc)
-    # Small epsilon everywhere to avoid log(0), high value at correct goals
-    eps = 1e-6
-    goal_mapping = jnp.ones((5, 2)) 
-    goal_mapping = goal_mapping.at[2, 0].set(50.0)  # Left reward -> goal at state 2 (top left)
-    goal_mapping = goal_mapping.at[4, 1].set(50.0)  # Right reward -> goal at state 4 (top right)
-    # Normalize columns so each is a valid distribution
-    goal_mapping = goal_mapping / jnp.sum(goal_mapping, axis=0, keepdims=True)
+    # Goal mapping: p(goal | state, reward_loc) using softmax for elegance
+    # For θ=left:  softmax([0, 0, 1, 0, 0]) → goal at state 2 (top left)
+    # For θ=right: softmax([0, 0, 0, 0, 1]) → goal at state 4 (top right)
+    goal_logits = jnp.array([
+        [0, 0],  # state 0 (bottom)
+        [0, 0],  # state 1 (middle)
+        [2, 0],  # state 2 (top-left) - goal for θ=left
+        [0, 0],  # state 3 (top-middle)
+        [0, 2],  # state 4 (top-right) - goal for θ=right
+    ])
+    goal_mapping = jax.nn.softmax(goal_logits, axis=0)
     
     return transition, reward_obs, goal_mapping

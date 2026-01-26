@@ -6,8 +6,10 @@ from .full_joint_vfe import (
     extract_reward_location_marginal,
     extract_all_action_marginals,
     extract_all_state_marginals,
+    extract_all_obs_marginals,
     enumerate_state_sequences,
     enumerate_action_sequences,
+    enumerate_obs_sequences,
 )
 
 __all__ = [
@@ -16,6 +18,8 @@ __all__ = [
     "extract_reward_location_marginal",
     "extract_all_action_marginals",
     "extract_all_state_marginals",
+    "extract_all_obs_marginals",
     "enumerate_state_sequences",
     "enumerate_action_sequences",
+    "enumerate_obs_sequences",
 ]

@@ -104,9 +104,10 @@ def run_episode(
         
         planning_config = PlanningConfig(
             planning_horizon=effective_horizon,
+            n_obs=2,  # T-maze has 2 observation types (cue for left/right)
             n_states=5,
             n_actions=4,
-            n_reward_locs=2,
+            n_theta=2,  # 2 possible reward locations (left/right)
             n_optimization_steps=config.n_optimization_steps,
             learning_rate=config.learning_rate,
             verbose=False,

@@ -1,4 +1,4 @@
-"""Planning via VFE minimization with full joint q(x_{1:T}, u_{1:T}, r)."""
+"""Planning via VFE minimization with full joint q(y_{1:T}, x_{1:T}, u_{1:T}, θ)."""
 
 from dataclasses import dataclass
 from typing import List
@@ -15,6 +15,7 @@ from ..objectives.full_joint_vfe import (
     extract_reward_location_marginal,
     extract_all_action_marginals,
     extract_all_state_marginals,
+    extract_all_obs_marginals,
     enumerate_state_sequences,
 )
 
@@ -23,9 +24,10 @@ from ..objectives.full_joint_vfe import (
 class PlanningConfig:
     """Configuration for planning optimization."""
     planning_horizon: int = 4
+    n_obs: int = 4
     n_states: int = 5
     n_actions: int = 4
-    n_reward_locs: int = 2
+    n_theta: int = 2  # renamed from n_reward_locs for clarity
     n_optimization_steps: int = 200
     learning_rate: float = 0.1
     verbose: bool = False
@@ -35,11 +37,12 @@ class PlanningConfig:
 @dataclass 
 class PlanningResult:
     """Result of planning optimization."""
-    q_xur: Array                 # q(x, u, r)
+    q_yxu_theta: Array           # q(y, x, u, θ)
     first_action_probs: Array    # q(u_1)
-    reward_location_probs: Array # q(r)
+    reward_location_probs: Array # q(θ)
     all_action_probs: Array      # q(u_t) for all t, shape (horizon, n_actions)
     all_state_probs: Array       # q(x_t) for all t, shape (horizon, n_states)
+    all_obs_probs: Array         # q(y_t) for all t, shape (horizon, n_obs)
     final_loss: float
     loss_history: List[float]
 
@@ -53,15 +56,16 @@ def plan_actions(
     config: PlanningConfig,
 ) -> PlanningResult:
     """
-    Plan actions by minimizing VFE over q(x_{1:T}, u_{1:T}, r).
+    Plan actions by minimizing VFE over q(y_{1:T}, x_{1:T}, u_{1:T}, θ).
     """
+    n_obs_seqs = config.n_obs ** config.planning_horizon
     n_state_seqs = config.n_states ** config.planning_horizon
     n_action_seqs = config.n_actions ** config.planning_horizon
     
-    # Initialize logits with reward prior
-    log_prior_r = jnp.log(prior_reward_location + 1e-10)
-    initial_logits = jnp.zeros((n_state_seqs, n_action_seqs, config.n_reward_locs))
-    initial_logits = initial_logits + log_prior_r[None, None, :]
+    # Initialize logits with θ prior
+    log_prior_theta = jnp.log(prior_reward_location + 1e-10)
+    initial_logits = jnp.zeros((n_obs_seqs, n_state_seqs, n_action_seqs, config.n_theta))
+    initial_logits = initial_logits + log_prior_theta[None, None, None, :]
     
     params = {'q_logits': initial_logits}
     
@@ -79,6 +83,7 @@ def plan_actions(
             observation_tensor=observation_tensor,
             goal_mapping=goal_mapping,
             action_prior=action_prior,
+            theta_prior=prior_reward_location,
             horizon=config.planning_horizon,
             inference_mode=config.inference_mode,
         )
@@ -99,29 +104,38 @@ def plan_actions(
             print(f"Step {i+1}/{config.n_optimization_steps}, Loss: {loss:.4f}")
     
     # Extract results
-    q_xur = softmax(params['q_logits'].flatten()).reshape(
-        (n_state_seqs, n_action_seqs, config.n_reward_locs)
+    q_yxu_theta = softmax(params['q_logits'].flatten()).reshape(
+        (n_obs_seqs, n_state_seqs, n_action_seqs, config.n_theta)
     )
     
     first_action_probs = extract_first_action_marginal(
-        params['q_logits'], config.n_states, config.n_actions, config.planning_horizon
+        params['q_logits'], config.n_obs, config.n_states, config.n_actions, 
+        config.n_theta, config.planning_horizon
     )
     reward_location_probs = extract_reward_location_marginal(
-        params['q_logits'], config.n_states, config.n_actions, config.planning_horizon
+        params['q_logits'], config.n_obs, config.n_states, config.n_actions, 
+        config.n_theta, config.planning_horizon
     )
     all_action_probs = extract_all_action_marginals(
-        params['q_logits'], config.n_states, config.n_actions, config.planning_horizon
+        params['q_logits'], config.n_obs, config.n_states, config.n_actions, 
+        config.n_theta, config.planning_horizon
     )
     all_state_probs = extract_all_state_marginals(
-        params['q_logits'], config.n_states, config.n_actions, config.planning_horizon
+        params['q_logits'], config.n_obs, config.n_states, config.n_actions, 
+        config.n_theta, config.planning_horizon
+    )
+    all_obs_probs = extract_all_obs_marginals(
+        params['q_logits'], config.n_obs, config.n_states, config.n_actions, 
+        config.n_theta, config.planning_horizon
     )
     
     return PlanningResult(
-        q_xur=q_xur,
+        q_yxu_theta=q_yxu_theta,
         first_action_probs=first_action_probs,
         reward_location_probs=reward_location_probs,
         all_action_probs=all_action_probs,
         all_state_probs=all_state_probs,
+        all_obs_probs=all_obs_probs,
         final_loss=loss_history[-1],
         loss_history=loss_history,
     )
