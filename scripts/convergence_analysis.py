@@ -273,12 +273,6 @@ def main():
         save_png=not args.no_png,
     )
     
-    # Run policy stability analysis
-    create_policy_stability_analysis(
-        n_optimization_steps=args.n_opt_steps,
-        planning_horizon=args.planning_horizon,
-        output_dir=output_dir,
-    )
 
 
 if __name__ == "__main__":

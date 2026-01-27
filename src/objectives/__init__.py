@@ -12,7 +12,14 @@ from .full_joint_vfe import (
     enumerate_obs_sequences,
 )
 
+from .factorized_vfe import (
+    factorized_vfe,
+    extract_marginals_from_factorized,
+    reconstruct_full_joint,
+)
+
 __all__ = [
+    # Full joint
     "full_joint_vfe",
     "extract_first_action_marginal",
     "extract_reward_location_marginal",
@@ -22,4 +29,8 @@ __all__ = [
     "enumerate_state_sequences",
     "enumerate_action_sequences",
     "enumerate_obs_sequences",
+    # Factorized
+    "factorized_vfe",
+    "extract_marginals_from_factorized",
+    "reconstruct_full_joint",
 ]

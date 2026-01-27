@@ -24,7 +24,11 @@ script_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(script_dir))
 
 from src.environments import TMaze, create_tmaze_tensors
-from src.planning import plan_actions, select_action, PlanningConfig
+from src.planning import (
+    plan_actions_factorized,
+    select_action_factorized,
+    FactorizedPlanningConfig,
+)
 from src.visualization import (
     plot_tmaze_frame,
     create_episode_video,
@@ -103,7 +107,7 @@ def run_episode(
         else:
             prior_reward_location = jnp.array([0.5, 0.5])
         
-        planning_config = PlanningConfig(
+        planning_config = FactorizedPlanningConfig(
             planning_horizon=effective_horizon,
             n_obs=2,  # T-maze has 2 observation types (cue for left/right)
             n_states=5,
@@ -114,7 +118,7 @@ def run_episode(
             verbose=False,
             inference_mode=config.inference_mode,
         )
-        result = plan_actions(
+        result = plan_actions_factorized(
             prior_state=prior_state,
             prior_reward_location=prior_reward_location,
             transition_tensor=transition_tensor,
@@ -122,7 +126,7 @@ def run_episode(
             goal_mapping=goal_mapping,
             config=planning_config,
         )
-        action = select_action(result)
+        action = select_action_factorized(result)
         actions.append(action)
         
         # Record planning snapshot for visualization

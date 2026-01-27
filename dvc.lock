@@ -6,161 +6,161 @@ stages:
     deps:
     - path: scripts/tmaze_experiment.py
       hash: md5
-      md5: a8958059fb9b1db77c7b47f6f742cad3
-      size: 15511
+      md5: bcce7db771845459bef398b734a8b9df
+      size: 15592
     - path: src/environments/tmaze.py
       hash: md5
       md5: 3d403f6635c8d39b72069132d2d4e568
       size: 9973
-    - path: src/objectives/full_joint_vfe.py
+    - path: src/objectives/factorized_vfe.py
       hash: md5
-      md5: d9b1732128def1b15ed21008bdea86c7
-      size: 17776
-    - path: src/planning/full_joint_optimizer.py
+      md5: a042b1f31de777f75270f404eea84645
+      size: 17966
+    - path: src/planning/factorized_optimizer.py
       hash: md5
-      md5: 9d01f094c36bac7c9f60b19cbb92f34f
-      size: 5067
+      md5: 7b19596efbb81385a4c1c37281532192
+      size: 6118
     - path: src/visualization/tmaze_viz.py
       hash: md5
       md5: b5d31c29037a3e10773d7c7e44ee0377
       size: 28111
     params:
       params.yaml:
-        experiment.learning_rate: 0.1
+        experiment.learning_rate: 0.05
         experiment.max_steps: 4
-        experiment.n_episodes: 100
-        experiment.n_optimization_steps: 120
+        experiment.n_episodes: 3
+        experiment.n_optimization_steps: 2000
         experiment.planning_horizon: 4
         experiment.receding_horizon: true
         experiment.seed: 42
     outs:
     - path: data/marginal/episode.mp4
       hash: md5
-      md5: 34e3d0264eabb1e2ab8645a7a062ef93
-      size: 9003
+      md5: e37ef15cf0b59a5d04e23b61bf63c197
+      size: 9686
     - path: data/marginal/frames
       hash: md5
-      md5: a62f1b43810d79d4a69a98bd11146baf.dir
-      size: 9247
-      nfiles: 6
+      md5: 8b274858e210a23251fa8f126181c54c.dir
+      size: 12288
+      nfiles: 8
     - path: data/marginal/results.json
       hash: md5
-      md5: f8ccb2e93fb957f0155c99e7bfa13433
-      size: 32225
+      md5: 528fdf9b36da012ec29423ae7271dbbe
+      size: 5102
     - path: data/marginal/stats.json
       hash: md5
-      md5: 660105fb9cf3a2e0990c5baf02890056
-      size: 180
+      md5: f886c4ea9bbe9a983f5b4405f2ae8289
+      size: 206
   experiment_active:
     cmd: uv run python scripts/tmaze_experiment.py --inference-mode active 
       --output-dir data/active
     deps:
     - path: scripts/tmaze_experiment.py
       hash: md5
-      md5: a8958059fb9b1db77c7b47f6f742cad3
-      size: 15511
+      md5: bcce7db771845459bef398b734a8b9df
+      size: 15592
     - path: src/environments/tmaze.py
       hash: md5
       md5: 3d403f6635c8d39b72069132d2d4e568
       size: 9973
-    - path: src/objectives/full_joint_vfe.py
+    - path: src/objectives/factorized_vfe.py
       hash: md5
-      md5: d9b1732128def1b15ed21008bdea86c7
-      size: 17776
-    - path: src/planning/full_joint_optimizer.py
+      md5: a042b1f31de777f75270f404eea84645
+      size: 17966
+    - path: src/planning/factorized_optimizer.py
       hash: md5
-      md5: 9d01f094c36bac7c9f60b19cbb92f34f
-      size: 5067
+      md5: 7b19596efbb81385a4c1c37281532192
+      size: 6118
     - path: src/visualization/tmaze_viz.py
       hash: md5
       md5: b5d31c29037a3e10773d7c7e44ee0377
       size: 28111
     params:
       params.yaml:
-        experiment.learning_rate: 0.1
+        experiment.learning_rate: 0.05
         experiment.max_steps: 4
-        experiment.n_episodes: 100
-        experiment.n_optimization_steps: 120
+        experiment.n_episodes: 3
+        experiment.n_optimization_steps: 2000
         experiment.planning_horizon: 4
         experiment.receding_horizon: true
         experiment.seed: 42
     outs:
     - path: data/active/episode.mp4
       hash: md5
-      md5: 17d5be407a36e952cd49feec44c8e78a
-      size: 11743
+      md5: 7a45d0c10a02459fdf1783bf4ecc5447
+      size: 11542
     - path: data/active/frames
       hash: md5
-      md5: a38c80d6443c32516c3d15304004db01.dir
+      md5: d54be49909bf7b3002b51befe1fd2069.dir
       size: 14884
       nfiles: 10
     - path: data/active/results.json
       hash: md5
-      md5: cb6bb0f1bfa84f1ef2fa09880615461e
-      size: 37875
+      md5: db4c70f4494ed224b126c77f5b831a97
+      size: 5621
     - path: data/active/stats.json
       hash: md5
-      md5: e77c55a8cc6cc4fde869e84d490c2626
-      size: 178
+      md5: 1306ed2e32302b253901b1340b909624
+      size: 174
   experiment_planning:
     cmd: uv run python scripts/tmaze_experiment.py --inference-mode planning 
       --output-dir data/planning
     deps:
     - path: scripts/tmaze_experiment.py
       hash: md5
-      md5: a8958059fb9b1db77c7b47f6f742cad3
-      size: 15511
+      md5: bcce7db771845459bef398b734a8b9df
+      size: 15592
     - path: src/environments/tmaze.py
       hash: md5
       md5: 3d403f6635c8d39b72069132d2d4e568
       size: 9973
-    - path: src/objectives/full_joint_vfe.py
+    - path: src/objectives/factorized_vfe.py
       hash: md5
-      md5: d9b1732128def1b15ed21008bdea86c7
-      size: 17776
-    - path: src/planning/full_joint_optimizer.py
+      md5: a042b1f31de777f75270f404eea84645
+      size: 17966
+    - path: src/planning/factorized_optimizer.py
       hash: md5
-      md5: 9d01f094c36bac7c9f60b19cbb92f34f
-      size: 5067
+      md5: 7b19596efbb81385a4c1c37281532192
+      size: 6118
     - path: src/visualization/tmaze_viz.py
       hash: md5
       md5: b5d31c29037a3e10773d7c7e44ee0377
       size: 28111
     params:
       params.yaml:
-        experiment.learning_rate: 0.1
+        experiment.learning_rate: 0.05
         experiment.max_steps: 4
-        experiment.n_episodes: 100
-        experiment.n_optimization_steps: 120
+        experiment.n_episodes: 3
+        experiment.n_optimization_steps: 2000
         experiment.planning_horizon: 4
         experiment.receding_horizon: true
         experiment.seed: 42
     outs:
     - path: data/planning/episode.mp4
       hash: md5
-      md5: dc7b3729d3a9c206f5ac1688f36de7d6
-      size: 8607
+      md5: 930fcc2b06ab19382bec945e15a68bbd
+      size: 8603
     - path: data/planning/frames
       hash: md5
-      md5: 7992beb0d52d96e7135ad7c45ab66fa9.dir
-      size: 9158
+      md5: 646f480ea03335346e6a5624570ea079.dir
+      size: 8268
       nfiles: 6
     - path: data/planning/results.json
       hash: md5
-      md5: 647f3d1e5f5ac331240b64223f7deef8
-      size: 32256
+      md5: 16ca6d8dcb22d0442afaa269a360d73e
+      size: 4231
     - path: data/planning/stats.json
       hash: md5
-      md5: eba72007e00de418aafe9e3ab88720c6
-      size: 181
+      md5: a56a93c2400e2479a4b578493a6b492b
+      size: 207
   convergence_analysis:
     cmd: uv run python scripts/convergence_analysis.py --output-dir 
       data/convergence
     deps:
     - path: scripts/convergence_analysis.py
       hash: md5
-      md5: 3eb1b9db5cfc7b1d1ed773d85f55fd63
-      size: 8860
+      md5: addd045437e6f63ccff24da850256b31
+      size: 8654
     - path: src/environments/tmaze.py
       hash: md5
       md5: 3d403f6635c8d39b72069132d2d4e568
@@ -171,26 +171,22 @@ stages:
       size: 17776
     - path: src/planning/full_joint_optimizer.py
       hash: md5
-      md5: 9d01f094c36bac7c9f60b19cbb92f34f
-      size: 5067
+      md5: dd838051f7845556e6490be6f5a441ee
+      size: 4949
     params:
       params.yaml:
-        experiment.n_optimization_steps: 120
-        experiment.planning_horizon: 4
+        experiment.n_optimization_steps: 500
+        experiment.planning_horizon: 5
     outs:
     - path: data/convergence/convergence.png
       hash: md5
-      md5: 350fa2ef84ba255110eef1965dee3170
-      size: 57414
+      md5: 0372354896beac610917b7fab16f6fd8
+      size: 57399
     - path: data/convergence/convergence.tex
       hash: md5
       md5: 30c79402ab7531639f2c5d70a156f724
       size: 941
     - path: data/convergence/convergence_data.csv
       hash: md5
-      md5: d51028e9cedb6220ea5d12820aa942ac
+      md5: 26d3fcd5fac1ad24c717d128cf370e16
       size: 1671
-    - path: data/convergence/policy_stability.csv
-      hash: md5
-      md5: 84e8674f986ef44c978809a2df190d88
-      size: 423

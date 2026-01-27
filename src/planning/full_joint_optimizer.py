@@ -62,10 +62,8 @@ def plan_actions(
     n_state_seqs = config.n_states ** config.planning_horizon
     n_action_seqs = config.n_actions ** config.planning_horizon
     
-    # Initialize logits with θ prior
-    log_prior_theta = jnp.log(prior_reward_location + 1e-10)
+    # Initialize logits to zeros (uniform distribution)
     initial_logits = jnp.zeros((n_obs_seqs, n_state_seqs, n_action_seqs, config.n_theta))
-    initial_logits = initial_logits + log_prior_theta[None, None, None, :]
     
     params = {'q_logits': initial_logits}
     

@@ -1,9 +1,9 @@
 # Experiment parameters for T-Maze DVC pipeline
 experiment:
-  n_episodes: 1000
+  n_episodes: 3
   max_steps: 4
   planning_horizon: 4
   receding_horizon: true
-  n_optimization_steps: 120
-  learning_rate: 0.1
+  n_optimization_steps: 2000  # Needed for active mode to converge properly
+  learning_rate: 0.05         # Lower LR for stable convergence with factorized dist
   seed: 42
