@@ -245,9 +245,25 @@ def factorized_vfe(
         log_control_prior = jnp.log(control_prior + EPS)
         epistemic_u_energy = -jnp.sum(q_u * log_control_prior)
         
-        # p̃(x) ∝ exp(-H[q(y|x)]) - uniform in T-maze due to symmetry
-        # (when marginalizing θ, q(y|x) = [0.5, 0.5] for all states)
-        epistemic_x_energy = 0.0
+        # p̃(x) ∝ exp(-H[q(y|x)]) - prefer states with low observation entropy
+        # NOTE: This is NOT uniform! q(y|x) = sum_θ q(y,θ|x) depends on q(θ|x).
+        # At the cue state, if q(θ|x) is peaked, q(y|x) is peaked (low H).
+        # If q(θ|x) is uniform, q(y|x) is uniform (high H).
+        # This creates an implicit dependence on θ beliefs!
+        
+        # q(y|x) = sum_θ q(y,θ|x) for each state sequence
+        # q_y_theta_given_x is (n_obs_seqs, n_theta, n_state_seqs)
+        q_y_given_x = jnp.sum(q_y_theta_given_x, axis=1)  # (n_obs_seqs, n_state_seqs)
+        
+        # H[q(y|x)] for each state sequence x
+        h_y_given_x = -jnp.sum(
+            q_y_given_x * jnp.log(q_y_given_x + EPS), axis=0
+        )  # (n_state_seqs,)
+        
+        # Prior: p̃(x) ∝ exp(-H[q(y|x)]) - low entropy (informative) states preferred
+        state_prior = softmax(-h_y_given_x)
+        log_state_prior = jnp.log(state_prior + EPS)
+        epistemic_x_energy = -jnp.sum(q_x * log_state_prior)
         
         # p̃(y,x) ∝ exp(KL[q(θ|y,x) || q(θ|x)]) - prefer (y,x) that update θ beliefs
         # q(y,x) = sum_θ q(y,θ,x)
@@ -365,50 +381,23 @@ def extract_marginals_from_factorized(
     q_theta = jnp.sum(q_x_theta, axis=0)
     q_y = jnp.sum(q_y_theta_x, axis=(1, 2))
     
-    # Extract time-slice marginals
+    # Extract time-slice marginals (vectorized)
     action_sequences = enumerate_action_sequences(n_actions, horizon)
     state_sequences = enumerate_state_sequences(n_states, horizon)
     obs_sequences = enumerate_obs_sequences(n_obs, horizon)
     
-    # q(u_1)
-    first_actions = action_sequences[:, 0]
-    q_first_action = jnp.zeros(n_actions)
-    for a in range(n_actions):
-        mask = (first_actions == a).astype(jnp.float32)
-        q_first_action = q_first_action.at[a].set(jnp.sum(q_u * mask))
+    # q(u_t) for all t using one-hot and matmul: (horizon, n_actions)
+    action_onehot = jax.nn.one_hot(action_sequences, n_actions)  # (n_action_seqs, horizon, n_actions)
+    q_all_actions = jnp.einsum('s,stn->tn', q_u, action_onehot)  # (horizon, n_actions)
+    q_first_action = q_all_actions[0]
     
-    # q(u_t) for all t
-    all_action_marginals = []
-    for t in range(horizon):
-        actions_t = action_sequences[:, t]
-        q_action_t = jnp.zeros(n_actions)
-        for a in range(n_actions):
-            mask = (actions_t == a).astype(jnp.float32)
-            q_action_t = q_action_t.at[a].set(jnp.sum(q_u * mask))
-        all_action_marginals.append(q_action_t)
-    q_all_actions = jnp.stack(all_action_marginals, axis=0)
+    # q(x_t) for all t: (horizon, n_states)
+    state_onehot = jax.nn.one_hot(state_sequences, n_states)  # (n_state_seqs, horizon, n_states)
+    q_all_states = jnp.einsum('s,stn->tn', q_x, state_onehot)  # (horizon, n_states)
     
-    # q(x_t) for all t
-    all_state_marginals = []
-    for t in range(horizon):
-        states_t = state_sequences[:, t]
-        q_state_t = jnp.zeros(n_states)
-        for s in range(n_states):
-            mask = (states_t == s).astype(jnp.float32)
-            q_state_t = q_state_t.at[s].set(jnp.sum(q_x * mask))
-        all_state_marginals.append(q_state_t)
-    q_all_states = jnp.stack(all_state_marginals, axis=0)
-    
-    # q(y_t) for all t
-    all_obs_marginals = []
-    for t in range(horizon):
-        obs_t = obs_sequences[:, t]
-        q_obs_t = jnp.zeros(n_obs)
-        for o in range(n_obs):
-            mask = (obs_t == o).astype(jnp.float32)
-            q_obs_t = q_obs_t.at[o].set(jnp.sum(q_y * mask))
-        all_obs_marginals.append(q_obs_t)
-    q_all_obs = jnp.stack(all_obs_marginals, axis=0)
+    # q(y_t) for all t: (horizon, n_obs)
+    obs_onehot = jax.nn.one_hot(obs_sequences, n_obs)  # (n_obs_seqs, horizon, n_obs)
+    q_all_obs = jnp.einsum('s,stn->tn', q_y, obs_onehot)  # (horizon, n_obs)
     
     return {
         'q_u': q_u,

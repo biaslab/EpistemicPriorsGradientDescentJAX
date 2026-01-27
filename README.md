@@ -74,14 +74,15 @@ Results saved to `data/`:
 
 ```
 ├── scripts/
-│   └── tmaze_experiment.py    # Main experiment script
+│   ├── tmaze_experiment.py    # Main experiment script
+│   └── diagnostics.py         # Diagnostic tools for tuning
 ├── src/
 │   ├── environments/
 │   │   └── tmaze.py           # T-Maze environment and tensors
 │   ├── objectives/
-│   │   └── full_joint_vfe.py  # VFE computation for all modes
+│   │   └── factorized_vfe.py  # VFE with factorized q(x|u)q(y,θ|x)q(u)
 │   ├── planning/
-│   │   └── full_joint_optimizer.py  # Adam optimization over q(x,u,r)
+│   │   └── factorized_optimizer.py  # Adam optimization
 │   └── visualization/
 │       └── tmaze_viz.py       # Video generation
 └── tests/

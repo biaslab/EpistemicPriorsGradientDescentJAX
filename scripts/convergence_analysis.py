@@ -12,16 +12,29 @@ import sys
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+import yaml
 
 script_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(script_dir))
 
 from src.environments import create_tmaze_tensors
-from src.planning import plan_actions, PlanningConfig
+from src.planning import plan_actions_factorized, FactorizedPlanningConfig
+
+
+def load_colors() -> dict:
+    """Load color scheme from params.yaml."""
+    params_path = script_dir / "params.yaml"
+    with open(params_path) as f:
+        params = yaml.safe_load(f)
+    return params.get("colors", {
+        "active": "#1F78B4",
+        "marginal": "#33A02C", 
+        "planning": "#FF7F00",
+    })
 
 
 def run_convergence_analysis(
-    n_optimization_steps: int = 500,
+    n_optimization_steps: int = 1000,
     planning_horizon: int = 4,
 ) -> dict:
     """
@@ -38,17 +51,18 @@ def run_convergence_analysis(
     results = {}
     
     for mode in modes:
-        config = PlanningConfig(
+        config = FactorizedPlanningConfig(
             planning_horizon=planning_horizon,
             n_obs=2,
             n_states=5,
             n_actions=4,
             n_theta=2,
             n_optimization_steps=n_optimization_steps,
+            learning_rate=0.05,
             inference_mode=mode,
         )
         
-        result = plan_actions(
+        result = plan_actions_factorized(
             prior_state=prior_state,
             prior_reward_location=theta_prior,
             transition_tensor=transition,
@@ -79,11 +93,7 @@ def create_convergence_plots(
     
     fig, ax = plt.subplots(figsize=(8, 5))
     
-    colors = {
-        "active": "#1f78b4",    # blue
-        "marginal": "#33a02c",  # green
-        "planning": "#ff7f00",  # orange
-    }
+    colors = load_colors()
     labels = {
         "active": "Active Inference",
         "marginal": "Marginal Inference", 
@@ -119,6 +129,7 @@ def create_convergence_plots(
 
 def _create_tikz_convergence_plot(results: dict, output_dir: Path) -> None:
     """Generate TikZ code for convergence plot."""
+    colors = load_colors()
     
     # Generate data file for pgfplots
     data_lines = ["iteration,active,marginal,planning"]
@@ -144,38 +155,42 @@ def _create_tikz_convergence_plot(results: dict, output_dir: Path) -> None:
         f.write("\n".join(data_lines))
     print(f"Saved: {data_path}")
     
+    # Convert colors to TikZ format (remove # prefix)
+    c_active = colors["active"].lstrip("#")
+    c_marginal = colors["marginal"].lstrip("#")
+    c_planning = colors["planning"].lstrip("#")
+    
     # Generate TikZ standalone document
-    tikz_code = r"""\documentclass[tikz,border=5pt]{standalone}
-\usepackage{pgfplots}
-\pgfplotsset{compat=1.18}
-\usepackage[dvipsnames]{xcolor}
+    tikz_code = rf"""\documentclass[tikz,border=5pt]{{standalone}}
+\usepackage{{pgfplots}}
+\pgfplotsset{{compat=1.18}}
+\usepackage[dvipsnames]{{xcolor}}
 
-% ColorBrewer colors
-\definecolor{CBblue}{HTML}{1f78b4}
-\definecolor{CBgreen}{HTML}{33a02c}
-\definecolor{CBorange}{HTML}{ff7f00}
+\definecolor{{activecolor}}{{HTML}}{{{c_active}}}
+\definecolor{{marginalcolor}}{{HTML}}{{{c_marginal}}}
+\definecolor{{planningcolor}}{{HTML}}{{{c_planning}}}
 
-\begin{document}
-\begin{tikzpicture}
-\begin{axis}[
+\begin{{document}}
+\begin{{tikzpicture}}
+\begin{{axis}}[
     width=10cm,
     height=6cm,
-    xlabel={Iteration},
-    ylabel={Variational Free Energy},
-    title={Free Energy Convergence},
+    xlabel={{Iteration}},
+    ylabel={{Variational Free Energy}},
+    title={{Free Energy Convergence}},
     legend pos=north east,
     grid=major,
-    grid style={gray!30},
+    grid style={{gray!30}},
 ]
-\addplot[CBblue, thick] table[x=iteration, y=active, col sep=comma] {convergence_data.csv};
-\addlegendentry{Active Inference}
-\addplot[CBgreen, thick] table[x=iteration, y=marginal, col sep=comma] {convergence_data.csv};
-\addlegendentry{Marginal Inference}
-\addplot[CBorange, thick] table[x=iteration, y=planning, col sep=comma] {convergence_data.csv};
-\addlegendentry{Planning Inference}
-\end{axis}
-\end{tikzpicture}
-\end{document}
+\addplot[activecolor, thick] table[x=iteration, y=active, col sep=comma] {{convergence_data.csv}};
+\addlegendentry{{Active Inference}}
+\addplot[marginalcolor, thick] table[x=iteration, y=marginal, col sep=comma] {{convergence_data.csv}};
+\addlegendentry{{Marginal Inference}}
+\addplot[planningcolor, thick] table[x=iteration, y=planning, col sep=comma] {{convergence_data.csv}};
+\addlegendentry{{Planning Inference}}
+\end{{axis}}
+\end{{tikzpicture}}
+\end{{document}}
 """
     
     tikz_path = output_dir / "convergence.tex"
@@ -185,7 +200,7 @@ def _create_tikz_convergence_plot(results: dict, output_dir: Path) -> None:
 
 
 def create_policy_stability_analysis(
-    n_optimization_steps: int = 500,
+    n_optimization_steps: int = 1000,
     planning_horizon: int = 4,
     output_dir: Path = None,
 ) -> None:
@@ -196,24 +211,25 @@ def create_policy_stability_analysis(
     prior_state = jnp.array([0, 1, 0, 0, 0], dtype=jnp.float32)
     theta_prior = jnp.array([0.5, 0.5])
     
-    checkpoints = [50, 100, 200, 300, 500]
+    checkpoints = [100, 500, 1000, 2000, 3000, 5000]
     checkpoints = [c for c in checkpoints if c <= n_optimization_steps]
     
     results = {mode: {} for mode in ["active", "marginal", "planning"]}
     
     for mode in ["active", "marginal", "planning"]:
         for n_steps in checkpoints:
-            config = PlanningConfig(
+            config = FactorizedPlanningConfig(
                 planning_horizon=planning_horizon,
                 n_obs=2,
                 n_states=5,
                 n_actions=4,
                 n_theta=2,
                 n_optimization_steps=n_steps,
+                learning_rate=0.05,
                 inference_mode=mode,
             )
             
-            result = plan_actions(
+            result = plan_actions_factorized(
                 prior_state=prior_state,
                 prior_reward_location=theta_prior,
                 transition_tensor=transition,
@@ -227,9 +243,11 @@ def create_policy_stability_analysis(
                 "p_south": float(result.first_action_probs[2]),
             }
     
-    # Save as CSV if output_dir provided
+    # Save outputs if output_dir provided
     if output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save CSV
         csv_lines = ["iterations,mode,p_north,p_south"]
         for mode in ["active", "marginal", "planning"]:
             for n_steps in checkpoints:
@@ -241,14 +259,113 @@ def create_policy_stability_analysis(
         with open(csv_path, 'w') as f:
             f.write("\n".join(csv_lines))
         print(f"Saved: {csv_path}")
+        
+        # Create PNG plot
+        _create_policy_stability_png(results, checkpoints, output_dir)
+        
+        # Create TikZ plot
+        _create_policy_stability_tikz(results, checkpoints, output_dir)
+
+
+def _create_policy_stability_png(results: dict, checkpoints: list, output_dir: Path) -> None:
+    """Generate PNG plot for policy stability."""
+    fig, ax = plt.subplots(figsize=(8, 5))
+    
+    colors = load_colors()
+    labels = {
+        "active": "Active Inference",
+        "marginal": "Marginal Inference",
+        "planning": "Planning Inference",
+    }
+    
+    for mode in ["active", "marginal", "planning"]:
+        p_south_values = [results[mode][n]["p_south"] for n in checkpoints]
+        ax.plot(
+            checkpoints,
+            p_south_values,
+            label=labels[mode],
+            color=colors[mode],
+            linewidth=2,
+            marker='o',
+            markersize=6,
+        )
+    
+    ax.set_xlabel("Optimization Steps")
+    ax.set_ylabel("P(South)")
+    ax.set_title("Policy Stability: P(South) vs Optimization Steps")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    ax.set_ylim(0, 1)
+    
+    plt.tight_layout()
+    
+    png_path = output_dir / "policy_stability.png"
+    plt.savefig(png_path, dpi=150, bbox_inches='tight')
+    print(f"Saved: {png_path}")
+    plt.close()
+
+
+def _create_policy_stability_tikz(results: dict, checkpoints: list, output_dir: Path) -> None:
+    """Generate TikZ code for policy stability plot."""
+    colors = load_colors()
+    
+    # Convert colors to TikZ format (remove # prefix)
+    c_active = colors["active"].lstrip("#")
+    c_marginal = colors["marginal"].lstrip("#")
+    c_planning = colors["planning"].lstrip("#")
+    
+    tikz_code = rf"""\documentclass[tikz,border=5pt]{{standalone}}
+\usepackage{{pgfplots}}
+\pgfplotsset{{compat=1.18}}
+\usepackage[dvipsnames]{{xcolor}}
+
+\definecolor{{activecolor}}{{HTML}}{{{c_active}}}
+\definecolor{{marginalcolor}}{{HTML}}{{{c_marginal}}}
+\definecolor{{planningcolor}}{{HTML}}{{{c_planning}}}
+
+\begin{{document}}
+\begin{{tikzpicture}}
+\begin{{axis}}[
+    width=10cm,
+    height=6cm,
+    xlabel={{Optimization Steps}},
+    ylabel={{$P(\mathrm{{South}})$}},
+    title={{Policy Stability}},
+    legend pos=north east,
+    grid=major,
+    grid style={{gray!30}},
+    ymin=0,
+    ymax=1,
+]
+"""
+    
+    # Add plots for each mode - now showing P(South) for exploration
+    for mode, color in [("active", "activecolor"), ("marginal", "marginalcolor"), ("planning", "planningcolor")]:
+        coords = " ".join(
+            f"({n},{results[mode][n]['p_south']:.4f})"
+            for n in checkpoints
+        )
+        label = {"active": "Active Inference", "marginal": "Marginal Inference", "planning": "Planning Inference"}[mode]
+        tikz_code += f"\\addplot[{color}, thick, mark=*] coordinates {{{coords}}};\n"
+        tikz_code += f"\\addlegendentry{{{label}}}\n"
+    
+    tikz_code += r"""\end{axis}
+\end{tikzpicture}
+\end{document}
+"""
+    
+    tikz_path = output_dir / "policy_stability.tex"
+    with open(tikz_path, 'w') as f:
+        f.write(tikz_code)
+    print(f"Saved: {tikz_path}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Convergence analysis for T-Maze VFE")
-    parser.add_argument("--n-opt-steps", type=int, default=500,
-                        help="Number of optimization steps")
+    parser.add_argument("--n-opt-steps", type=int, default=5000,
+                        help="Number of optimization steps (default: 5000)")
     parser.add_argument("--planning-horizon", type=int, default=4,
-                        help="Planning horizon")
+                        help="Planning horizon (default: 4)")
     parser.add_argument("--output-dir", type=str, default="data/convergence",
                         help="Output directory for figures")
     parser.add_argument("--no-png", action="store_true",
@@ -273,6 +390,13 @@ def main():
         save_png=not args.no_png,
     )
     
+    # Run policy stability analysis
+    create_policy_stability_analysis(
+        n_optimization_steps=args.n_opt_steps,
+        planning_horizon=args.planning_horizon,
+        output_dir=output_dir,
+    )
+
 
 
 if __name__ == "__main__":

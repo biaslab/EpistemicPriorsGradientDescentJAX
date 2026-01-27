@@ -22,7 +22,7 @@ from ..objectives.factorized_vfe import (
 class FactorizedPlanningConfig:
     """Configuration for factorized planning optimization."""
     planning_horizon: int = 4
-    n_obs: int = 4
+    n_obs: int = 2
     n_states: int = 5
     n_actions: int = 4
     n_theta: int = 2
@@ -30,6 +30,8 @@ class FactorizedPlanningConfig:
     learning_rate: float = 0.1
     verbose: bool = False
     inference_mode: str = "marginal"
+    init_seed: int = 18
+    init_noise_scale: float = 1.0
 
 
 @dataclass 
@@ -66,8 +68,12 @@ def plan_actions_factorized(
     n_state_seqs = config.n_states ** config.planning_horizon
     n_action_seqs = config.n_actions ** config.planning_horizon
     
-    # Initialize q(u) to uniform
-    q_u_logits = jnp.zeros(n_action_seqs)
+    # Initialize q(u) - uniform or with random perturbations
+    if config.init_noise_scale > 0:
+        key = jax.random.PRNGKey(config.init_seed)
+        q_u_logits = jax.random.normal(key, (n_action_seqs,)) * config.init_noise_scale
+    else:
+        q_u_logits = jnp.zeros(n_action_seqs)
     
     # Initialize q(x|u) to match transition dynamics p(x|u, x_0)
     # This breaks the softmax gradient vanishing problem by making q(x) depend on q(u)
@@ -116,20 +122,35 @@ def plan_actions_factorized(
             inference_mode=config.inference_mode,
         )
     
-    @jax.jit
-    def step(params, opt_state):
+    def step(params, opt_state, loss_history, i):
         loss, grads = jax.value_and_grad(loss_fn)(params)
         updates, opt_state = optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
-        return params, opt_state, loss
+        loss_history = loss_history.at[i].set(loss)
+        return params, opt_state, loss_history
     
-    loss_history = []
-    for i in range(config.n_optimization_steps):
-        params, opt_state, loss = step(params, opt_state)
-        loss_history.append(float(loss))
-        
-        if config.verbose and (i + 1) % 50 == 0:
-            print(f"Step {i+1}/{config.n_optimization_steps}, Loss: {loss:.4f}")
+    @jax.jit
+    def run_optimization(params, opt_state):
+        loss_history = jnp.zeros(config.n_optimization_steps)
+        def body_fn(i, carry):
+            params, opt_state, loss_history = carry
+            return step(params, opt_state, loss_history, i)
+        return jax.lax.fori_loop(
+            0, config.n_optimization_steps, body_fn, (params, opt_state, loss_history)
+        )
+    
+    if config.verbose:
+        # Slow path with printing
+        loss_history = jnp.zeros(config.n_optimization_steps)
+        for i in range(config.n_optimization_steps):
+            params, opt_state, loss_history = step(params, opt_state, loss_history, i)
+            if (i + 1) % 50 == 0:
+                print(f"Step {i+1}/{config.n_optimization_steps}, Loss: {loss_history[i]:.4f}")
+        loss_history = loss_history.tolist()
+    else:
+        # Fast path: everything stays on device
+        params, opt_state, loss_history = run_optimization(params, opt_state)
+        loss_history = loss_history.tolist()
     
     # Extract results
     marginals = extract_marginals_from_factorized(

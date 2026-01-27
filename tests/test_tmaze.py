@@ -8,7 +8,7 @@ sys.path.insert(0, str(__file__).rsplit('/', 2)[0])
 
 from src.environments import TMaze, create_tmaze_tensors
 from src.distributions import categorical_entropy, categorical_kl
-from src.planning import plan_actions, PlanningConfig
+from src.planning import plan_actions_factorized, FactorizedPlanningConfig
 
 
 class TestTMazeEnvironment:
@@ -104,7 +104,7 @@ class TestPlanning:
         """Test that planning returns valid probability distributions."""
         transition, obs, goal = create_tmaze_tensors()
         
-        config = PlanningConfig(
+        config = FactorizedPlanningConfig(
             planning_horizon=2,
             n_obs=2,
             n_states=5,
@@ -116,7 +116,7 @@ class TestPlanning:
         prior_state = jnp.array([0, 1, 0, 0, 0], dtype=jnp.float32)  # At middle
         prior_reward = jnp.array([0.5, 0.5])
         
-        result = plan_actions(
+        result = plan_actions_factorized(
             prior_state=prior_state,
             prior_reward_location=prior_reward,
             transition_tensor=transition,
@@ -135,7 +135,7 @@ class TestPlanning:
         """Test that agent goes directly to goal when reward location is known."""
         transition, obs, goal = create_tmaze_tensors()
         
-        config = PlanningConfig(
+        config = FactorizedPlanningConfig(
             planning_horizon=4,
             n_obs=2,
             n_states=5,
@@ -149,7 +149,7 @@ class TestPlanning:
         prior_state = jnp.array([0, 1, 0, 0, 0], dtype=jnp.float32)
         prior_reward = jnp.array([1.0, 0.0])  # Certain left
         
-        result = plan_actions(
+        result = plan_actions_factorized(
             prior_state=prior_state,
             prior_reward_location=prior_reward,
             transition_tensor=transition,

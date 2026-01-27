@@ -245,14 +245,13 @@ def create_tmaze_tensors() -> Tuple[Array, Array, Array]:
     reward_obs = reward_obs.at[:, 0, 1].set(jnp.array([0.0, 1.0]))  # Right reward -> right cue
     
     # Goal mapping: p(goal | state, reward_loc) using softmax for elegance
-    # For θ=left:  softmax([0, 0, 1, 0, 0]) → goal at state 2 (top left)
-    # For θ=right: softmax([0, 0, 0, 0, 1]) → goal at state 4 (top right)
+    goal_temp = 4
     goal_logits = jnp.array([
-        [0, 0],  # state 0 (bottom)
-        [0, 0],  # state 1 (middle)
-        [2, 0],  # state 2 (top-left) - goal for θ=left
-        [0, 0],  # state 3 (top-middle)
-        [0, 2],  # state 4 (top-right) - goal for θ=right
+        [0, 0],           # state 0 (bottom)
+        [0, 0],           # state 1 (middle)
+        [goal_temp, 0],   # state 2 (top-left) - goal for θ=left
+        [0, 0],           # state 3 (top-middle)
+        [0, goal_temp],   # state 4 (top-right) - goal for θ=right
     ])
     goal_mapping = jax.nn.softmax(goal_logits, axis=0)
     
