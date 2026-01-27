@@ -1,24 +1,18 @@
 """Objective functions for planning."""
 
-from .full_joint_vfe import (
-    full_joint_vfe,
-    extract_first_action_marginal,
-    extract_reward_location_marginal,
-    extract_all_action_marginals,
-    extract_all_state_marginals,
-    extract_all_obs_marginals,
+from .factorized_vfe import (
+    factorized_vfe,
+    extract_marginals_from_factorized,
+    reconstruct_full_joint,
     enumerate_state_sequences,
     enumerate_action_sequences,
     enumerate_obs_sequences,
 )
 
 __all__ = [
-    "full_joint_vfe",
-    "extract_first_action_marginal",
-    "extract_reward_location_marginal",
-    "extract_all_action_marginals",
-    "extract_all_state_marginals",
-    "extract_all_obs_marginals",
+    "factorized_vfe",
+    "extract_marginals_from_factorized",
+    "reconstruct_full_joint",
     "enumerate_state_sequences",
     "enumerate_action_sequences",
     "enumerate_obs_sequences",

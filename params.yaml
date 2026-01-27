@@ -1,9 +1,15 @@
 # Experiment parameters for T-Maze DVC pipeline
 experiment:
-  n_episodes: 1000
+  n_episodes: 100
   max_steps: 4
   planning_horizon: 4
   receding_horizon: true
-  n_optimization_steps: 120
-  learning_rate: 0.1
-  seed: 42
+  n_optimization_steps: 5000
+  learning_rate: 0.05
+  seed: 18
+
+# Color scheme (ColorBrewer Paired palette)
+colors:
+  active: "#1F78B4"    # blue
+  marginal: "#33A02C"  # green
+  planning: "#FF7F00"  # orange

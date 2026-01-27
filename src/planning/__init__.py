@@ -1,15 +1,15 @@
-"""Planning via variational optimization with full joint factorization."""
+"""Planning via variational optimization with factorized distribution."""
 
-from .full_joint_optimizer import (
-    plan_actions,
-    select_action,
-    PlanningConfig,
-    PlanningResult,
+from .factorized_optimizer import (
+    plan_actions_factorized,
+    select_action_factorized,
+    FactorizedPlanningConfig,
+    FactorizedPlanningResult,
 )
 
 __all__ = [
-    "plan_actions",
-    "select_action",
-    "PlanningConfig",
-    "PlanningResult",
+    "plan_actions_factorized",
+    "select_action_factorized",
+    "FactorizedPlanningConfig",
+    "FactorizedPlanningResult",
 ]
