@@ -20,21 +20,33 @@ State 2 (left arm) --- State 3 (top) --- State 4 (right arm)
 
 ## Variational Parametrization
 
-Full joint distribution `q(x_{1:T}, u_{1:T}, r)` parametrized as logits with shape:
+The joint distribution is **factorized** as:
 
 ```
-(n_states^T, n_actions^T, n_reward_locs) = (5^T, 4^T, 2)
+q(y_{1:T}, x_{1:T}, u_{1:T}, θ) = q(x|u) q(y,θ|x) q(u)
 ```
 
-For horizon T=4: `(625, 256, 2)` parameters, optimized via Adam.
+Where:
+- `q(u)`: distribution over action sequences — shape `(n_actions^T,)` = `(256,)` for T=4
+- `q(x|u)`: states given actions — shape `(n_states^T, n_actions^T)` = `(625, 256)`
+- `q(y,θ|x)`: observations and reward location given states — shape `(n_obs^T, n_theta, n_states^T)` = `(16, 2, 625)`
+
+**Total parameters for T=4**: 256 + 160,000 + 20,000 = **180,256 parameters**, optimized via Adam.
+
+Entropy decomposes as:
+```
+H[q] = H[q(u)] + E_{q(u)}[H[q(x|u)]] + E_{q(x)}[H[q(y,θ|x)]]
+```
 
 ## Inference Modes
 
-| Mode | Description |
-|------|-------------|
-| `marginal` | Standard VFE: entropy + action prior + transition + goal + reward prior |
-| `active` | VFE + epistemic state prior (low observation entropy) + control prior (high transition entropy) |
-| `planning` | VFE + planning entropy correction: `∑_t H[q(x_{t-1}, u_t)] - H[q(x_{t-1})]` |
+Three modes implementing different forms of epistemic priors:
+
+| Mode | VFE Components |
+|------|----------------|
+| **marginal** | Standard VFE: `-H[q] + E_q[-log p(u,x,y,θ,goal)]` |
+| **active** | Standard VFE + **Epistemic Priors**:<br>• `p̃(u) ∝ exp(H[q(x\|u)])` — prefer uncertain state outcomes<br>• `p̃(x) ∝ exp(-H[q(y\|x)])` — prefer informative observations<br>• `p̃(y,x) ∝ exp(KL[q(θ\|y,x) ‖ q(θ\|x)])` — prefer belief updates |
+| **planning** | Standard VFE + **Entropy Correction**: `∑_t H[q(x_{t-1}, u_t)] - H[q(x_{t-1})]`<br>Corrects for planning-as-inference structure |
 
 ## Usage
 
@@ -49,23 +61,54 @@ uv run python scripts/tmaze_experiment.py --inference-mode planning
 ```
 
 ### Options
-
-```
---inference-mode    marginal | active | planning (default: marginal)
---n-episodes        Number of episodes (default: 50)
---max-steps         Max steps per episode (default: 4)
---planning-horizon  Planning horizon T (default: 4)
---n-opt-steps       Optimization steps per planning call (default: 100)
---learning-rate     Adam learning rate (default: 0.1)
---seed              Random seed (default: 42)
---verbose, -v       Print per-step details
---output-dir        Output directory (default: data)
---no-video          Skip video generation
+   marginal | active | planning (default: marginal)
+--n-episodes           Number of episodes (default: from params.yaml: 100)
+--max-steps            Max steps per episode (default: from params.yaml: 4)
+--planning-horizon     Planning horizon T (default: from params.yaml: 4)
+--n-opt-steps          Optimization steps per planning call (default: from params.yaml: 5000)
+--learning-rate        Adam learning rate (default: from params.yaml: 0.05)
+--seed                 Random seed (default: from params.yaml: 18)
+--verbose, -v          Print per-step details
+--output-dir           Output directory (default: data/<inference-mode>)
+--no-video             Skip video generation
+--no-tikz              Skip TikZ frame generation
 --no-receding-horizon  Use fixed horizon instead of receding
 ```
 
-## Output
+Note: CLI arguments override values from `params.yaml`.o-video          Skip video generation
+--no-receding-horizon  Use fixed horizon instead of receding
+```
+are organized by inference mode in `data/<inference-mode>/`:
 
+```
+data/
+├── marginal/
+│   ├── results.json           # Full episode data and trajectories
+│   ├── stats.json             # Summary statistics (mean reward, success rate, etc.)
+│   ├── episode.mp4            # Video of last episode with planning visualization
+│   └── frames/                # TikZ frames for LaTeX (frame_XX.tex, frame_XX_arrows.tex)
+├── active/
+│   └── ... (same structure)
+├── planning/
+│   └── ... (same structure)
+├── convergence/               # Convergence analysis results
+├── tmaze.tex                  # Reference T-maze diagram for papers
+└── colors.tex                 # Color scheme definitions
+```
+
+### DVC Pipeline
+
+The project uses DVC for reproducible experiments:
+
+```bash
+# Run all three inference modes
+dvc repro
+
+# Run specific stage
+dvc repro -s marginal_experiment
+dvc repro -s active_experiment
+dvc repro -s planning_experiment
+```
 Results saved to `data/`:
 - `results_{mode}_{timestamp}.json` — episode data and summary statistics
 - `episode_{mode}_{timestamp}.mp4` — video of last episode
