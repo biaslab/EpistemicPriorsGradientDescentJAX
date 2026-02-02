@@ -1,6 +1,6 @@
 # Experiment parameters for T-Maze DVC pipeline
 experiment:
-  n_episodes: 100
+  n_episodes: 100 
   max_steps: 4
   planning_horizon: 4
   receding_horizon: true

@@ -10,8 +10,8 @@ stages:
       size: 15592
     - path: src/environments/tmaze.py
       hash: md5
-      md5: 5cadf8324468491a288e958cdeb30d83
-      size: 9883
+      md5: 3ac36d90524b5762cd377661fd55377c
+      size: 9901
     - path: src/objectives/factorized_vfe.py
       hash: md5
       md5: 3e96a395ef5392d2163e70a63f73437b
@@ -36,8 +36,8 @@ stages:
     outs:
     - path: data/marginal/episode.mp4
       hash: md5
-      md5: 5b3adcd05a08b89b2f86ddbec3885dc6
-      size: 9373
+      md5: fe84bc8c97992f2ee86a524e545ee707
+      size: 9386
     - path: data/marginal/frames
       hash: md5
       md5: b4b6bbc902dcbbe3c7a0dc9d051da9dc.dir
@@ -45,8 +45,8 @@ stages:
       nfiles: 8
     - path: data/marginal/results.json
       hash: md5
-      md5: 587becb2b807d366ec624ae4f38dacf2
-      size: 35319
+      md5: a2732478040df1e7b138e88a1fda2968
+      size: 35314
     - path: data/marginal/stats.json
       hash: md5
       md5: a0024a7ab7e72a0f7dddf5a8fae6367b
@@ -61,8 +61,8 @@ stages:
       size: 15592
     - path: src/environments/tmaze.py
       hash: md5
-      md5: 5cadf8324468491a288e958cdeb30d83
-      size: 9883
+      md5: 3ac36d90524b5762cd377661fd55377c
+      size: 9901
     - path: src/objectives/factorized_vfe.py
       hash: md5
       md5: 3e96a395ef5392d2163e70a63f73437b
@@ -87,17 +87,17 @@ stages:
     outs:
     - path: data/active/episode.mp4
       hash: md5
-      md5: c03d975e10d3e4c7c915ee21dad56760
-      size: 11788
+      md5: ea5885624cfbe205920136c3abb82935
+      size: 11832
     - path: data/active/frames
       hash: md5
-      md5: 18844442091d173e44a73ac60bc4720a.dir
-      size: 14706
+      md5: 7c45df78f03e342cc71cc71751af0456.dir
+      size: 14617
       nfiles: 10
     - path: data/active/results.json
       hash: md5
-      md5: 104aac790fe295f6641ddce6aa8bf737
-      size: 37907
+      md5: 7b222ad4fd01913e111bb0d962941411
+      size: 37912
     - path: data/active/stats.json
       hash: md5
       md5: 45e11608a5a138387b6a4c4ae1c0b8f9
@@ -112,8 +112,8 @@ stages:
       size: 15592
     - path: src/environments/tmaze.py
       hash: md5
-      md5: 5cadf8324468491a288e958cdeb30d83
-      size: 9883
+      md5: 3ac36d90524b5762cd377661fd55377c
+      size: 9901
     - path: src/objectives/factorized_vfe.py
       hash: md5
       md5: 3e96a395ef5392d2163e70a63f73437b
@@ -138,8 +138,8 @@ stages:
     outs:
     - path: data/planning/episode.mp4
       hash: md5
-      md5: 071dacf9d0ecb4743569fb089a43492b
-      size: 9126
+      md5: 437c969efc8071a5015b3aa337a31b82
+      size: 9131
     - path: data/planning/frames
       hash: md5
       md5: 163f5388a228c09dd22391704235f8ee.dir
@@ -147,8 +147,8 @@ stages:
       nfiles: 8
     - path: data/planning/results.json
       hash: md5
-      md5: d19f43939e9a22a6bd7bc4c67d67ed00
-      size: 35409
+      md5: c46adb20fdd91134654ee0638723a4a2
+      size: 35421
     - path: data/planning/stats.json
       hash: md5
       md5: 1c09dfe32c98cd31de3bd7ae559abc73
@@ -163,8 +163,8 @@ stages:
       size: 12716
     - path: src/environments/tmaze.py
       hash: md5
-      md5: 5cadf8324468491a288e958cdeb30d83
-      size: 9883
+      md5: 3ac36d90524b5762cd377661fd55377c
+      size: 9901
     - path: src/objectives/factorized_vfe.py
       hash: md5
       md5: 3e96a395ef5392d2163e70a63f73437b
@@ -180,25 +180,25 @@ stages:
     outs:
     - path: data/convergence/convergence.png
       hash: md5
-      md5: 45e7f3681423ababe6ab7e7e00002f92
-      size: 43341
+      md5: 7c61866bb932e3007d0803e9a0a7c063
+      size: 43606
     - path: data/convergence/convergence.tex
       hash: md5
       md5: 31aeac8038f05cc640b54f6ce5555b63
       size: 952
     - path: data/convergence/convergence_data.csv
       hash: md5
-      md5: 380a409ebb16d46c5245497f803279d7
+      md5: c90a6e93beee976b9d60ee24fdb6b60a
       size: 16460
     - path: data/convergence/policy_stability.csv
       hash: md5
-      md5: 5efa011bb8f72b6139d994ee1bfa120e
+      md5: 34b829ed70ccd3aff1b97bdfcef3e4b2
       size: 517
     - path: data/convergence/policy_stability.png
       hash: md5
-      md5: a4da0f33f713a78156691e9bbe8cf0ad
-      size: 45115
+      md5: 424548acf074248e6c854b2b82b1bf64
+      size: 46496
     - path: data/convergence/policy_stability.tex
       hash: md5
-      md5: 2772b0eb4c2614d898ddff27b9f4c4bb
+      md5: 695bdd48b3e77fa0857336ef13938e3d
       size: 1081

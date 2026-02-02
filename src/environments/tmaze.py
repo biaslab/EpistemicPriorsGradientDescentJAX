@@ -249,9 +249,9 @@ def create_tmaze_tensors() -> Tuple[Array, Array, Array]:
     goal_logits = jnp.array([
         [0, 0],           # state 0 (bottom)
         [0, 0],           # state 1 (middle)
-        [goal_temp, 0],   # state 2 (top-left) - goal for θ=left
+        [goal_temp, -goal_temp],   # state 2 (top-left) - goal for θ=left
         [0, 0],           # state 3 (top-middle)
-        [0, goal_temp],   # state 4 (top-right) - goal for θ=right
+        [-goal_temp, goal_temp],   # state 4 (top-right) - goal for θ=right
     ])
     goal_mapping = jax.nn.softmax(goal_logits, axis=0)
     
