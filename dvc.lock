@@ -167,8 +167,8 @@ stages:
       size: 9901
     - path: src/objectives/factorized_vfe.py
       hash: md5
-      md5: 3e96a395ef5392d2163e70a63f73437b
-      size: 18049
+      md5: a48743a39b22b2f2f19563fc137eb6c3
+      size: 17859
     - path: src/planning/factorized_optimizer.py
       hash: md5
       md5: 2a5b86cfc312a8cffb74f1b8c72e0d37
@@ -180,25 +180,25 @@ stages:
     outs:
     - path: data/convergence/convergence.png
       hash: md5
-      md5: 7c61866bb932e3007d0803e9a0a7c063
-      size: 43606
+      md5: 6ba07052bc591a36c3b864568bd43233
+      size: 43860
     - path: data/convergence/convergence.tex
       hash: md5
       md5: 31aeac8038f05cc640b54f6ce5555b63
       size: 952
     - path: data/convergence/convergence_data.csv
       hash: md5
-      md5: c90a6e93beee976b9d60ee24fdb6b60a
+      md5: ac5d4d668e671e152e9f0635f9822d48
       size: 16460
     - path: data/convergence/policy_stability.csv
       hash: md5
-      md5: 34b829ed70ccd3aff1b97bdfcef3e4b2
+      md5: 55cdf96eb74674abc0d00f722c6a466e
       size: 517
     - path: data/convergence/policy_stability.png
       hash: md5
-      md5: 424548acf074248e6c854b2b82b1bf64
-      size: 46496
+      md5: ab62709179371c9150dba5d818aa5998
+      size: 47692
     - path: data/convergence/policy_stability.tex
       hash: md5
-      md5: 695bdd48b3e77fa0857336ef13938e3d
+      md5: 581f16f5eb03218ab437ca22c411f21f
       size: 1081

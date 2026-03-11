@@ -15,7 +15,7 @@ H[q] = H[q(u)] + E_{q(u)}[H[q(x|u)]] + E_{q(x)}[H[q(y,θ|x)]]
 
 Epistemic priors (active mode):
 - p̃(u) ∝ exp(H[q(x|u)])              - prefer actions with uncertain state outcomes
-- p̃(x) ∝ exp(-H[q(y|x)])             - prefer states with informative observations  
+- p̃(x) ∝ exp(-E_{q(θ|x)}[H[q(y|x,θ)]]) - prefer states with informative observations given θ
 - p̃(y,x) ∝ exp(KL[q(θ|y,x)||q(θ|x)]) - prefer (y,x) pairs that update beliefs about θ
 """
 
@@ -245,23 +245,21 @@ def factorized_vfe(
         log_control_prior = jnp.log(control_prior + EPS)
         epistemic_u_energy = -jnp.sum(q_u * log_control_prior)
         
-        # p̃(x) ∝ exp(-H[q(y|x)]) - prefer states with low observation entropy
-        # NOTE: This is NOT uniform! q(y|x) = sum_θ q(y,θ|x) depends on q(θ|x).
-        # At the cue state, if q(θ|x) is peaked, q(y|x) is peaked (low H).
-        # If q(θ|x) is uniform, q(y|x) is uniform (high H).
-        # This creates an implicit dependence on θ beliefs!
-        
-        # q(y|x) = sum_θ q(y,θ|x) for each state sequence
+        # p̃(x) ∝ exp(-E_{q(θ|x)}[H[q(y|x,θ)]]) - prefer states with informative observations given θ
         # q_y_theta_given_x is (n_obs_seqs, n_theta, n_state_seqs)
-        q_y_given_x = jnp.sum(q_y_theta_given_x, axis=1)  # (n_obs_seqs, n_state_seqs)
-        
-        # H[q(y|x)] for each state sequence x
-        h_y_given_x = -jnp.sum(
-            q_y_given_x * jnp.log(q_y_given_x + EPS), axis=0
+
+        # q(θ|x) = Σ_y q(y,θ|x)
+        q_theta_given_x_local = jnp.sum(q_y_theta_given_x, axis=0)  # (n_theta, n_state_seqs)
+
+        # q(y|θ,x) = q(y,θ|x) / q(θ|x)
+        q_y_given_theta_x = q_y_theta_given_x / (q_theta_given_x_local[None, :, :] + EPS)
+
+        # Σ_{y,θ} q(y,θ|x) log q(y|θ,x) = -E_{q(θ|x)}[H[q(y|θ,x)]]
+        neg_cond_entropy = jnp.sum(
+            q_y_theta_given_x * jnp.log(q_y_given_theta_x + EPS), axis=(0, 1)
         )  # (n_state_seqs,)
-        
-        # Prior: p̃(x) ∝ exp(-H[q(y|x)]) - low entropy (informative) states preferred
-        state_prior = softmax(-h_y_given_x)
+
+        state_prior = softmax(neg_cond_entropy)
         log_state_prior = jnp.log(state_prior + EPS)
         epistemic_x_energy = -jnp.sum(q_x * log_state_prior)
         
