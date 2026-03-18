@@ -1,21 +1,90 @@
 stages:
-  convergence_analysis:
-    cmd: uv run python scripts/convergence_analysis.py --output-dir data/convergence 
+  convergence_curves:
+    cmd: uv run python scripts/convergence_analysis.py --analysis curves --output-dir data/convergence
     params:
-      - experiment.n_optimization_steps
-      - experiment.planning_horizon
+      - convergence.curves
     deps:
       - scripts/convergence_analysis.py
       - src/environments/tmaze.py
       - src/planning/factorized_optimizer.py
       - src/objectives/factorized_vfe.py
     outs:
-      - data/convergence/convergence.png
-      - data/convergence/convergence.tex
-      - data/convergence/convergence_data.csv
-      - data/convergence/policy_stability.png
-      - data/convergence/policy_stability.tex
-      - data/convergence/policy_stability.csv
+      - data/convergence/curves.json
+
+  convergence_lr_sweep:
+    cmd: uv run python scripts/convergence_analysis.py --analysis lr_sweep --output-dir data/convergence
+    params:
+      - convergence.lr_sweep
+    deps:
+      - scripts/convergence_analysis.py
+      - src/environments/tmaze.py
+      - src/planning/factorized_optimizer.py
+      - src/objectives/factorized_vfe.py
+    outs:
+      - data/convergence/lr_sweep.json
+
+  convergence_budget:
+    cmd: uv run python scripts/convergence_analysis.py --analysis budget --output-dir data/convergence
+    params:
+      - convergence.budget
+    deps:
+      - scripts/convergence_analysis.py
+      - src/environments/tmaze.py
+      - src/planning/factorized_optimizer.py
+      - src/objectives/factorized_vfe.py
+    outs:
+      - data/convergence/budget.json
+
+  convergence_variance:
+    cmd: uv run python scripts/convergence_analysis.py --analysis variance --output-dir data/convergence
+    params:
+      - convergence.variance
+    deps:
+      - scripts/convergence_analysis.py
+      - src/environments/tmaze.py
+      - src/planning/factorized_optimizer.py
+      - src/objectives/factorized_vfe.py
+    outs:
+      - data/convergence/variance.json
+
+  convergence_policy_stability:
+    cmd: uv run python scripts/convergence_analysis.py --analysis policy_stability --output-dir data/convergence
+    params:
+      - convergence.policy_stability
+    deps:
+      - scripts/convergence_analysis.py
+      - src/environments/tmaze.py
+      - src/planning/factorized_optimizer.py
+      - src/objectives/factorized_vfe.py
+    outs:
+      - data/convergence/policy_stability.json
+
+  convergence_scenario_curves:
+    cmd: uv run python scripts/convergence_analysis.py --analysis scenario_curves --output-dir data/convergence
+    params:
+      - convergence.scenario_curves
+    deps:
+      - scripts/convergence_analysis.py
+      - src/environments/tmaze.py
+      - src/planning/factorized_optimizer.py
+      - src/objectives/factorized_vfe.py
+    outs:
+      - data/convergence/scenario_curves.json
+
+  convergence_figures:
+    cmd: uv run python scripts/plot_convergence.py --input-dir data/convergence --output-dir data/convergence/figures
+    params:
+      - colors
+    deps:
+      - scripts/plot_convergence.py
+      - data/convergence/curves.json
+      - data/convergence/lr_sweep.json
+      - data/convergence/budget.json
+      - data/convergence/variance.json
+      - data/convergence/policy_stability.json
+      - data/convergence/scenario_curves.json
+    outs:
+      - data/convergence/figures
 
   experiment_marginal:
     cmd: uv run python scripts/tmaze_experiment.py --inference-mode marginal --output-dir data/marginal

@@ -1,12 +1,53 @@
 # Experiment parameters for T-Maze DVC pipeline
 experiment:
-  n_episodes: 100 
+  n_episodes: 100
   max_steps: 4
   planning_horizon: 4
   receding_horizon: true
-  n_optimization_steps: 5000
+  n_optimization_steps: 1500
   learning_rate: 0.05
   seed: 18
+
+# Convergence analysis parameters
+convergence:
+  curves:
+    n_episodes: 10
+    n_optimization_steps: 1500
+    learning_rate: 0.05
+    planning_horizon: 4
+    max_steps: 4
+    seed: 42
+  lr_sweep:
+    learning_rates: [0.005, 0.01, 0.05, 0.1]
+    n_episodes: 10
+    n_optimization_steps: 1500
+    planning_horizon: 4
+    max_steps: 4
+    seed: 42
+  budget:
+    budgets: [50, 100, 250, 500, 1000, 1500, 2000]
+    n_episodes: 10
+    learning_rate: 0.05
+    planning_horizon: 4
+    max_steps: 4
+    seed: 42
+  variance:
+    seeds: [42, 43, 44, 45, 46, 47, 48, 49, 50, 51]
+    n_episodes: 10
+    n_optimization_steps: 1500
+    learning_rate: 0.05
+    planning_horizon: 4
+    max_steps: 4
+  policy_stability:
+    budgets: [50, 100, 250, 500, 1000, 1500, 2000, 5000]
+    learning_rate: 0.05
+    planning_horizon: 4
+    seed: 42
+  scenario_curves:
+    n_optimization_steps: 1500
+    learning_rate: 0.05
+    planning_horizon: 4
+    seed: 42
 
 # Color scheme (ColorBrewer Paired palette)
 colors:
