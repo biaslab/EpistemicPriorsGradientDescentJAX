@@ -292,18 +292,79 @@ def compute_entropy_terms(
 def compute_epistemic_priors(
     q_theta: Array,                          # (n_theta,)
     q_x_theta: Array,                        # (horizon+1, n_states, n_theta)
+    q_u_given_x: Array,                     # (horizon, n_states, n_actions)
+    q_x_given_xu_theta: Array,              # (S,S,A,Θ) when constant_obs, (H,S,S,A,Θ) otherwise, or dummy
     modality_groups: List[ModalityGroup],
     horizon: int = None,
     constant_obs: bool = False,
+    include_bethe: bool = False,
 ) -> Array:
     """
     Compute epistemic prior energies for Active Inference.
 
-    Includes state info prior (θ-uncertainty over states) and observation prior
-    (θ-information gain per observation). The control prior (Bethe) has been
-    replaced by the planning correction computed separately.
+    Includes:
+    - Bethe control prior: ũ(u_t) ∝ exp(H[q(x_t,x_{t-1}|u_t)] - H[q(x_{t-1}|u_t)])
+    - State info prior: ũ(x_t) ∝ exp(-E_{q(θ|x)}[H[q(y|x,θ)]])
+    - Observation prior: ũ(y,x) ∝ exp(KL[q(θ|y,x) || q(θ|x)])
     """
     total = 0.0
+
+    # ============ Bethe control prior ============
+    if include_bethe:
+        # Stop gradient on inputs used to compute prior targets
+        q_x_theta_prev_sg = jax.lax.stop_gradient(q_x_theta[:-1])  # (H, S, Θ)
+        var_trans_sg = jax.lax.stop_gradient(q_x_given_xu_theta)
+
+        # Differentiable expectation weights
+        q_x_prev_all = jnp.sum(q_x_theta[:-1], axis=2)  # (H, S)
+        q_u_all = jnp.sum(q_u_given_x * q_x_prev_all[:, :, None], axis=1)  # (H, A)
+
+        # Stopped q(u) for computing prior targets
+        q_u_all_sg = jnp.sum(
+            q_u_given_x * jnp.sum(q_x_theta_prev_sg, axis=2)[:, :, None], axis=1)  # (H, A)
+
+        if constant_obs:
+            # var_trans_sg: (S_next, S_prev, A, Θ) — captured via closure
+            def _bethe_step_const(carry, inputs):
+                q_x_theta_t_sg, q_u_given_x_t, q_u_t_sg, q_u_t = inputs
+                # q(x,θ|u) = q(u|x) q(x,θ) / q(u)
+                q_x_theta_given_u = (
+                    q_u_given_x_t[:, :, None] * q_x_theta_t_sg[:, None, :]
+                ) / (q_u_t_sg[None, :, None] + EPS)  # (S, A, Θ)
+                # q(x_t, x_{t-1} | u) = Σ_θ q(x_t|x_{t-1},u,θ) q(x_{t-1},θ|u)
+                q_joint = jnp.einsum('xpat,pat->xpa', var_trans_sg, q_x_theta_given_u)
+                q_joint_safe = jnp.clip(q_joint, EPS, 1.0)
+                h_joint = -jnp.sum(q_joint_safe * jnp.log(q_joint_safe), axis=(0, 1))  # (A,)
+                q_x_prev_given_u = jnp.sum(q_x_theta_given_u, axis=2)  # (S, A)
+                q_x_prev_safe = jnp.clip(q_x_prev_given_u, EPS, 1.0)
+                h_marg = -jnp.sum(q_x_prev_safe * jnp.log(q_x_prev_safe), axis=0)  # (A,)
+                log_control_prior = jnp.log(softmax(h_joint - h_marg) + EPS)
+                return carry + (-jnp.sum(q_u_t * log_control_prior)), None
+
+            bethe_total, _ = jax.lax.scan(
+                _bethe_step_const, 0.0,
+                (q_x_theta_prev_sg, q_u_given_x, q_u_all_sg, q_u_all))
+            total += bethe_total
+        else:
+            # var_trans_sg: (H, S_next, S_prev, A, Θ) — passed as scan input
+            def _bethe_step_tv(carry, inputs):
+                q_x_theta_t_sg, q_u_given_x_t, q_u_t_sg, q_u_t, var_trans_t_sg = inputs
+                q_x_theta_given_u = (
+                    q_u_given_x_t[:, :, None] * q_x_theta_t_sg[:, None, :]
+                ) / (q_u_t_sg[None, :, None] + EPS)
+                q_joint = jnp.einsum('xpat,pat->xpa', var_trans_t_sg, q_x_theta_given_u)
+                q_joint_safe = jnp.clip(q_joint, EPS, 1.0)
+                h_joint = -jnp.sum(q_joint_safe * jnp.log(q_joint_safe), axis=(0, 1))
+                q_x_prev_given_u = jnp.sum(q_x_theta_given_u, axis=2)
+                q_x_prev_safe = jnp.clip(q_x_prev_given_u, EPS, 1.0)
+                h_marg = -jnp.sum(q_x_prev_safe * jnp.log(q_x_prev_safe), axis=0)
+                log_control_prior = jnp.log(softmax(h_joint - h_marg) + EPS)
+                return carry + (-jnp.sum(q_u_t * log_control_prior)), None
+
+            bethe_total, _ = jax.lax.scan(
+                _bethe_step_tv, 0.0,
+                (q_x_theta_prev_sg, q_u_given_x, q_u_all_sg, q_u_all, var_trans_sg))
+            total += bethe_total
 
     # ============ State info prior + Obs prior — scan over timesteps ============
     # Prior values: fixed targets (stop gradient so prior doesn't reshape theta/obs beliefs)
@@ -614,12 +675,15 @@ def temporal_vfe_jit(
             transition_index, use_transition_index,
             freeze_obs_and_transitions,  # frozen
         )
-        # static_argnums: horizon(3), constant_obs(4)
+        # Bethe requires dense transition tensor (not available with index path)
+        include_bethe = q_x_given_xu_theta is not None
+        bethe_trans = q_x_given_xu_theta if include_bethe else jnp.zeros(())
+        # static_argnums: horizon(5), constant_obs(6), include_bethe(7)
         epistemic_energy = jax.checkpoint(
-            compute_epistemic_priors, static_argnums=(3, 4)
+            compute_epistemic_priors, static_argnums=(5, 6, 7)
         )(
-            q_theta, q_x_theta_ep,
-            modality_groups, horizon, freeze_obs_and_transitions,
+            q_theta, q_x_theta_ep, q_u_given_x, bethe_trans,
+            modality_groups, horizon, freeze_obs_and_transitions, include_bethe,
         )
         vfe = vfe + planning_correction + epistemic_energy
     elif inference_mode == "planning":

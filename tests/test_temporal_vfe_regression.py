@@ -109,12 +109,11 @@ def test_temporal_vfe_value_and_grad(inference_mode):
             f"{inference_mode}: grad[{i}] norm {gnorm:.8f} != ref {ref['grad_norms'][i]:.8f}"
 
 
-# Reference values from original (loop-based) implementation
-# These were captured by running the test before vectorization
+# Reference values for unified temporal_vfe (with Bethe control prior in active mode)
 REFERENCE_VALUES = {
-    "marginal": {"value": 8.4810810089, "grad_norms": [0.6133067607879639, 0.27373576164245605, 0.31200340390205383]},
-    "active": {"value": 45.2728500366, "grad_norms": [0.6133067607879639, 0.2503315210342407, 0.296514093875885]},
-    "planning": {"value": 11.9153862000, "grad_norms": [0.6219660043716431, 0.233661949634552, 0.3072192966938019]},
+    "marginal": {"value": 8.4810800552, "grad_norms": [0.6133068799972534, 0.27373582124710083, 0.3120035231113434]},
+    "active": {"value": 48.7071533203, "grad_norms": [0.6219660043716431, 0.24006876349449158, 0.2932417094707489]},
+    "planning": {"value": 11.9153842926, "grad_norms": [0.6219660043716431, 0.23366200923919678, 0.30721938610076904]},
 }
 
 
