@@ -129,7 +129,7 @@ def analysis_curves(args, base_config):
 def analysis_lr_sweep(args, base_config):
     """Learning rate sensitivity for each inference mode."""
     print("=== Learning Rate Sweep Analysis ===")
-    learning_rates = [float(x) for x in args.learning_rates.split(",")]
+    learning_rates = args.learning_rates
     output = {
         "analysis": "lr_sweep",
         "base_config": {
@@ -171,7 +171,7 @@ def analysis_lr_sweep(args, base_config):
 def analysis_budget(args, base_config):
     """Performance vs compute budget (n_opt_steps) for each inference mode."""
     print("=== Optimization Budget Analysis ===")
-    budgets = [int(x) for x in args.optimization_budgets.split(",")]
+    budgets = args.optimization_budgets
     output = {
         "analysis": "budget",
         "base_config": {
@@ -212,15 +212,14 @@ def analysis_budget(args, base_config):
 def analysis_variance(args, base_config):
     """Robustness across random initializations for each inference mode."""
     print("=== Variance Analysis ===")
-    base_seed = base_config["seed"]
+    seeds = args.seeds
     output = {
         "analysis": "variance",
         "base_config": {
             "n_episodes": base_config["n_episodes"],
             "n_opt_steps": args.n_opt_steps,
             "learning_rate": args.learning_rate,
-            "n_seeds": args.n_seeds,
-            "base_seed": base_seed,
+            "seeds": seeds,
             "n_theta": base_config["n_theta"],
             "horizon": base_config["horizon"],
         },
@@ -228,8 +227,7 @@ def analysis_variance(args, base_config):
     }
     for mode in INFERENCE_MODES:
         mode_data = []
-        for seed_offset in range(args.n_seeds):
-            seed = base_seed + seed_offset
+        for seed in seeds:
             print(f"  {mode} seed={seed}")
             result = run_experiment(
                 n_episodes=base_config["n_episodes"],
@@ -391,16 +389,36 @@ def main():
             return cli_val
         return yaml_dict.get(key, default)
 
-    args.n_opt_steps = resolve(args.n_opt_steps, conv_params, "base_n_opt_steps", 1000)
-    args.learning_rate = resolve(args.learning_rate, conv_params, "base_learning_rate", 0.01)
-    args.learning_rates = resolve(args.learning_rates, conv_params, "learning_rates",
-                                   "0.001,0.005,0.01,0.05,0.1")
-    args.optimization_budgets = resolve(args.optimization_budgets, conv_params,
-                                         "optimization_budgets", "50,100,250,500,1000,2000")
-    args.n_seeds = resolve(args.n_seeds, conv_params, "n_seeds", 20)
+    # Per-analysis sub-sections (matching tmaze convergence structure)
+    analysis_params = conv_params.get(args.analysis, {})
+
+    args.n_opt_steps = resolve(args.n_opt_steps, analysis_params, "n_optimization_steps", 1000)
+    args.learning_rate = resolve(args.learning_rate, analysis_params, "learning_rate", 0.01)
+
+    # Learning rates: CLI is comma-separated string, yaml is a list
+    if args.learning_rates is not None:
+        args.learning_rates = [float(x) for x in args.learning_rates.split(",")]
+    else:
+        lr_sweep_params = conv_params.get("lr_sweep", {})
+        args.learning_rates = lr_sweep_params.get("learning_rates", [0.005, 0.01, 0.05, 0.1])
+
+    # Budgets: CLI is comma-separated string, yaml is a list
+    if args.optimization_budgets is not None:
+        args.optimization_budgets = [int(x) for x in args.optimization_budgets.split(",")]
+    else:
+        budget_params = conv_params.get("budget", {})
+        args.optimization_budgets = budget_params.get("budgets", [50, 100, 250, 500, 1000, 2000])
+
+    # Seeds: CLI is n_seeds (int), yaml is explicit list
+    variance_params = conv_params.get("variance", {})
+    if args.n_seeds is not None:
+        base_seed = resolve(args.seed, yaml_params, "seed", 42)
+        args.seeds = [base_seed + i for i in range(args.n_seeds)]
+    else:
+        args.seeds = variance_params.get("seeds", [42, 43, 44, 45, 46])
 
     base_config = {
-        "n_episodes": resolve(args.n_episodes, conv_params, "n_episodes", 5),
+        "n_episodes": resolve(args.n_episodes, analysis_params, "n_episodes", 20),
         "n_theta": resolve(args.n_theta, yaml_params, "n_theta", 2),
         "horizon": resolve(args.horizon, yaml_params, "horizon", 7),
         "max_steps": resolve(args.max_steps, yaml_params, "max_steps", 5),
@@ -408,7 +426,7 @@ def main():
         "cue_observation_accuracy": resolve(args.cue_accuracy, yaml_params, "cue_observation_accuracy", 1.0),
         "cue_cost_epsilon": yaml_params.get("cue_cost_epsilon", 0.01),
         "location_observation_accuracy": yaml_params.get("location_observation_accuracy", 0.90),
-        "seed": resolve(args.seed, yaml_params, "seed", 42),
+        "seed": resolve(args.seed, analysis_params, "seed", resolve(None, yaml_params, "seed", 42)),
         "verbose": args.verbose,
     }
 

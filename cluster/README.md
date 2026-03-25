@@ -23,6 +23,7 @@ cd EpistemicPriorsExperiments
 ```
 cluster/
 ├── setup_env.sh            # Shared environment bootstrap (modules + venv)
+├── job_smoke_test.sh       # Smoke test: validate GPU + deps before real runs
 ├── submit_all.sh           # Submit jobs: all, or by environment
 ├── submit_tmaze.sh         # Submit all T-maze stages
 ├── submit_epistemic.sh     # Submit all epistemic maze stages
@@ -54,6 +55,22 @@ source cluster/setup_env.sh
 ```
 
 ## Submitting jobs
+
+### Smoke test (run first)
+
+Validate that GPU, JAX, pymdp, and project imports all work before submitting real jobs:
+
+```bash
+sbatch cluster/job_smoke_test.sh
+# wait for completion, then check:
+cat logs/smoke_test_<jobid>.out
+```
+
+The smoke test checks:
+1. JAX sees a GPU device
+2. A JAX matmul actually executes on GPU
+3. `inferactively-pymdp` is installed (and reports whether it's from the pinned git commit or PyPI)
+4. All project modules are importable
 
 ### All environments
 

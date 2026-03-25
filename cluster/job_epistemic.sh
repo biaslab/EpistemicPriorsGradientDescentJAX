@@ -40,6 +40,13 @@ N_THETA=$(read_param "['epistemic_maze']['n_theta']")
 GOAL_TEMP=$(read_param "['epistemic_maze']['goal_temperature']")
 CUE_ACC=$(read_param "['epistemic_maze']['cue_observation_accuracy']")
 SEED=$(read_param "['epistemic_maze']['seed']")
+RECEDING_HORIZON=$(read_param "['epistemic_maze']['receding_horizon']")
+
+# Build receding horizon flag
+RECEDING_FLAG=""
+if [ "$RECEDING_HORIZON" = "False" ] || [ "$RECEDING_HORIZON" = "false" ]; then
+    RECEDING_FLAG="--no-receding-horizon"
+fi
 
 case "${STAGE_TYPE:?STAGE_TYPE not set}" in
     experiment)
@@ -62,7 +69,8 @@ case "${STAGE_TYPE:?STAGE_TYPE not set}" in
                 --n-theta "$N_THETA" \
                 --goal-temperature "$GOAL_TEMP" \
                 --cue-accuracy "$CUE_ACC" \
-                --seed "$SEED"
+                --seed "$SEED" \
+                $RECEDING_FLAG
         else
             # Sophisticated/vanilla: no optimization params, no inference mode
             python scripts/epistemic_maze/experiment.py \
@@ -81,11 +89,6 @@ case "${STAGE_TYPE:?STAGE_TYPE not set}" in
     convergence)
         ANALYSIS="${ANALYSIS:?ANALYSIS not set}"
 
-        # Convergence-specific base params
-        CONV_N_EPS=$(read_param "['epistemic_maze']['convergence']['n_episodes']")
-        CONV_N_OPT=$(read_param "['epistemic_maze']['convergence']['base_n_opt_steps']")
-        CONV_LR=$(read_param "['epistemic_maze']['convergence']['base_learning_rate']")
-
         # Common args shared by all convergence analyses
         COMMON_ARGS=(
             --output-dir data/epistemic_maze/convergence
@@ -93,55 +96,66 @@ case "${STAGE_TYPE:?STAGE_TYPE not set}" in
             --horizon "$HORIZON"
             --goal-temperature "$GOAL_TEMP"
             --cue-accuracy "$CUE_ACC"
-            --seed "$SEED"
+            --max-steps "$MAX_STEPS"
         )
 
         case "$ANALYSIS" in
             curves)
+                CONV_N_EPS=$(read_param "['epistemic_maze']['convergence']['curves']['n_episodes']")
+                CONV_N_OPT=$(read_param "['epistemic_maze']['convergence']['curves']['n_optimization_steps']")
+                CONV_LR=$(read_param "['epistemic_maze']['convergence']['curves']['learning_rate']")
+                CONV_SEED=$(read_param "['epistemic_maze']['convergence']['curves']['seed']")
                 python scripts/epistemic_maze/convergence_analysis.py \
                     --analysis curves \
                     --n-episodes "$CONV_N_EPS" \
                     --n-opt-steps "$CONV_N_OPT" \
                     --learning-rate "$CONV_LR" \
-                    --max-steps "$MAX_STEPS" \
+                    --seed "$CONV_SEED" \
                     "${COMMON_ARGS[@]}"
                 ;;
             lr_sweep)
-                LRS=$(read_param "['epistemic_maze']['convergence']['learning_rates']")
+                CONV_N_EPS=$(read_param "['epistemic_maze']['convergence']['lr_sweep']['n_episodes']")
+                CONV_N_OPT=$(read_param "['epistemic_maze']['convergence']['lr_sweep']['n_optimization_steps']")
+                CONV_SEED=$(read_param "['epistemic_maze']['convergence']['lr_sweep']['seed']")
                 python scripts/epistemic_maze/convergence_analysis.py \
                     --analysis lr_sweep \
                     --n-episodes "$CONV_N_EPS" \
                     --n-opt-steps "$CONV_N_OPT" \
-                    --learning-rates "$LRS" \
-                    --max-steps "$MAX_STEPS" \
+                    --seed "$CONV_SEED" \
                     "${COMMON_ARGS[@]}"
                 ;;
             budget)
-                BUDGETS=$(read_param "['epistemic_maze']['convergence']['optimization_budgets']")
+                CONV_N_EPS=$(read_param "['epistemic_maze']['convergence']['budget']['n_episodes']")
+                CONV_LR=$(read_param "['epistemic_maze']['convergence']['budget']['learning_rate']")
+                CONV_SEED=$(read_param "['epistemic_maze']['convergence']['budget']['seed']")
                 python scripts/epistemic_maze/convergence_analysis.py \
                     --analysis budget \
                     --n-episodes "$CONV_N_EPS" \
-                    --optimization-budgets "$BUDGETS" \
                     --learning-rate "$CONV_LR" \
-                    --max-steps "$MAX_STEPS" \
+                    --seed "$CONV_SEED" \
                     "${COMMON_ARGS[@]}"
                 ;;
             variance)
-                N_SEEDS=$(read_param "['epistemic_maze']['convergence']['n_seeds']")
+                CONV_N_EPS=$(read_param "['epistemic_maze']['convergence']['variance']['n_episodes']")
+                CONV_N_OPT=$(read_param "['epistemic_maze']['convergence']['variance']['n_optimization_steps']")
+                CONV_LR=$(read_param "['epistemic_maze']['convergence']['variance']['learning_rate']")
                 python scripts/epistemic_maze/convergence_analysis.py \
                     --analysis variance \
                     --n-episodes "$CONV_N_EPS" \
                     --n-opt-steps "$CONV_N_OPT" \
                     --learning-rate "$CONV_LR" \
-                    --n-seeds "$N_SEEDS" \
-                    --max-steps "$MAX_STEPS" \
-                    "${COMMON_ARGS[@]}"
+                    "${COMMON_ARGS[@]}" \
+                    --seed "$SEED"
                 ;;
             scenario_curves)
+                CONV_N_OPT=$(read_param "['epistemic_maze']['convergence']['curves']['n_optimization_steps']")
+                CONV_LR=$(read_param "['epistemic_maze']['convergence']['curves']['learning_rate']")
+                CONV_SEED=$(read_param "['epistemic_maze']['convergence']['curves']['seed']")
                 python scripts/epistemic_maze/convergence_analysis.py \
                     --analysis scenario_curves \
                     --n-opt-steps "$CONV_N_OPT" \
                     --learning-rate "$CONV_LR" \
+                    --seed "$CONV_SEED" \
                     "${COMMON_ARGS[@]}"
                 ;;
             *)

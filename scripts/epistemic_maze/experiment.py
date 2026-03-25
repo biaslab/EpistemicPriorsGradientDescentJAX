@@ -275,6 +275,7 @@ def run_episode(
     config: TemporalPlanningConfig,
     location_observation_accuracy: float = 0.90,
     max_steps: int = 7,
+    receding_horizon: bool = True,
     verbose: bool = False,
 ) -> Dict:
     """
@@ -301,7 +302,10 @@ def run_episode(
     state_belief = state_belief / jnp.sum(state_belief + 1e-8)
     for step in range(max_steps):
         # Receding horizon
-        effective_horizon = min(max_steps - step, config.planning_horizon)
+        if receding_horizon:
+            effective_horizon = min(max_steps - step, config.planning_horizon)
+        else:
+            effective_horizon = config.planning_horizon
         if effective_horizon <= 0:
             break
 
@@ -427,6 +431,7 @@ def run_experiment(
     verbose: bool = False,
     strategy: str = "temporal",
     policy_len: int = None,
+    receding_horizon: bool = True,
 ) -> Dict:
     """Run full experiment.
 
@@ -512,7 +517,7 @@ def run_experiment(
             print(f"\nEpisode {episode_idx + 1}: Theta={env.theta}")
 
         # Run episode
-        episode_data = run_episode_fn(
+        episode_kwargs = dict(
             env=env,
             transition_tensor=transition_tensor,
             observation_tensor=observation_tensor,
@@ -525,6 +530,10 @@ def run_experiment(
             max_steps=max_steps,
             verbose=verbose,
         )
+        # Only temporal strategy supports receding horizon
+        if run_episode_fn is run_episode:
+            episode_kwargs["receding_horizon"] = receding_horizon
+        episode_data = run_episode_fn(**episode_kwargs)
 
         episodes.append(episode_data)
 
@@ -602,6 +611,8 @@ def main():
     parser.add_argument('--goal-temperature', type=float, default=None)
     parser.add_argument('--cue-accuracy', type=float, default=None)
     parser.add_argument('--seed', type=int, default=None)
+    parser.add_argument('--no-receding-horizon', action='store_true',
+                        help='Disable receding horizon (use full horizon throughout episode)')
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.add_argument('--output-dir', type=str, default='data/epistemic_maze')
 
@@ -665,6 +676,7 @@ def main():
         verbose=args.verbose,
         strategy=args.strategy,
         policy_len=args.policy_len,
+        receding_horizon=not args.no_receding_horizon,
     )
 
     # Create output directory

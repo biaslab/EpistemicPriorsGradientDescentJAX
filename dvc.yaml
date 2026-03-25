@@ -173,6 +173,7 @@ stages:
       - epistemic_maze.n_episodes
       - epistemic_maze.horizon
       - epistemic_maze.max_steps
+      - epistemic_maze.receding_horizon
       - epistemic_maze.n_optimization_steps
       - epistemic_maze.learning_rate
       - epistemic_maze.n_theta
@@ -208,6 +209,7 @@ stages:
       - epistemic_maze.n_episodes
       - epistemic_maze.horizon
       - epistemic_maze.max_steps
+      - epistemic_maze.receding_horizon
       - epistemic_maze.n_optimization_steps
       - epistemic_maze.learning_rate
       - epistemic_maze.n_theta
@@ -243,6 +245,7 @@ stages:
       - epistemic_maze.n_episodes
       - epistemic_maze.horizon
       - epistemic_maze.max_steps
+      - epistemic_maze.receding_horizon
       - epistemic_maze.n_optimization_steps
       - epistemic_maze.learning_rate
       - epistemic_maze.n_theta
@@ -320,19 +323,17 @@ stages:
       uv run python scripts/epistemic_maze/convergence_analysis.py
       --analysis curves
       --output-dir data/epistemic_maze/convergence
-      --n-episodes ${epistemic_maze.convergence.n_episodes}
-      --n-opt-steps ${epistemic_maze.convergence.base_n_opt_steps}
-      --learning-rate ${epistemic_maze.convergence.base_learning_rate}
+      --n-episodes ${epistemic_maze.convergence.curves.n_episodes}
+      --n-opt-steps ${epistemic_maze.convergence.curves.n_optimization_steps}
+      --learning-rate ${epistemic_maze.convergence.curves.learning_rate}
       --n-theta ${epistemic_maze.n_theta}
       --horizon ${epistemic_maze.horizon}
       --max-steps ${epistemic_maze.max_steps}
       --goal-temperature ${epistemic_maze.goal_temperature}
       --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
-      --seed ${epistemic_maze.seed}
+      --seed ${epistemic_maze.convergence.curves.seed}
     params:
-      - epistemic_maze.convergence.n_episodes
-      - epistemic_maze.convergence.base_n_opt_steps
-      - epistemic_maze.convergence.base_learning_rate
+      - epistemic_maze.convergence.curves
       - epistemic_maze
     deps:
       - scripts/epistemic_maze/convergence_analysis.py
@@ -348,19 +349,16 @@ stages:
       uv run python scripts/epistemic_maze/convergence_analysis.py
       --analysis lr_sweep
       --output-dir data/epistemic_maze/convergence
-      --n-episodes ${epistemic_maze.convergence.n_episodes}
-      --n-opt-steps ${epistemic_maze.convergence.base_n_opt_steps}
-      --learning-rates ${epistemic_maze.convergence.learning_rates}
+      --n-episodes ${epistemic_maze.convergence.lr_sweep.n_episodes}
+      --n-opt-steps ${epistemic_maze.convergence.lr_sweep.n_optimization_steps}
       --n-theta ${epistemic_maze.n_theta}
       --horizon ${epistemic_maze.horizon}
       --max-steps ${epistemic_maze.max_steps}
       --goal-temperature ${epistemic_maze.goal_temperature}
       --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
-      --seed ${epistemic_maze.seed}
+      --seed ${epistemic_maze.convergence.lr_sweep.seed}
     params:
-      - epistemic_maze.convergence.n_episodes
-      - epistemic_maze.convergence.base_n_opt_steps
-      - epistemic_maze.convergence.learning_rates
+      - epistemic_maze.convergence.lr_sweep
       - epistemic_maze
     deps:
       - scripts/epistemic_maze/convergence_analysis.py
@@ -376,19 +374,16 @@ stages:
       uv run python scripts/epistemic_maze/convergence_analysis.py
       --analysis budget
       --output-dir data/epistemic_maze/convergence
-      --n-episodes ${epistemic_maze.convergence.n_episodes}
-      --optimization-budgets ${epistemic_maze.convergence.optimization_budgets}
-      --learning-rate ${epistemic_maze.convergence.base_learning_rate}
+      --n-episodes ${epistemic_maze.convergence.budget.n_episodes}
+      --learning-rate ${epistemic_maze.convergence.budget.learning_rate}
       --n-theta ${epistemic_maze.n_theta}
       --horizon ${epistemic_maze.horizon}
       --max-steps ${epistemic_maze.max_steps}
       --goal-temperature ${epistemic_maze.goal_temperature}
       --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
-      --seed ${epistemic_maze.seed}
+      --seed ${epistemic_maze.convergence.budget.seed}
     params:
-      - epistemic_maze.convergence.n_episodes
-      - epistemic_maze.convergence.optimization_budgets
-      - epistemic_maze.convergence.base_learning_rate
+      - epistemic_maze.convergence.budget
       - epistemic_maze
     deps:
       - scripts/epistemic_maze/convergence_analysis.py
@@ -404,10 +399,9 @@ stages:
       uv run python scripts/epistemic_maze/convergence_analysis.py
       --analysis variance
       --output-dir data/epistemic_maze/convergence
-      --n-episodes ${epistemic_maze.convergence.n_episodes}
-      --n-opt-steps ${epistemic_maze.convergence.base_n_opt_steps}
-      --learning-rate ${epistemic_maze.convergence.base_learning_rate}
-      --n-seeds ${epistemic_maze.convergence.n_seeds}
+      --n-episodes ${epistemic_maze.convergence.variance.n_episodes}
+      --n-opt-steps ${epistemic_maze.convergence.variance.n_optimization_steps}
+      --learning-rate ${epistemic_maze.convergence.variance.learning_rate}
       --n-theta ${epistemic_maze.n_theta}
       --horizon ${epistemic_maze.horizon}
       --max-steps ${epistemic_maze.max_steps}
@@ -415,7 +409,7 @@ stages:
       --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
       --seed ${epistemic_maze.seed}
     params:
-      - epistemic_maze.convergence
+      - epistemic_maze.convergence.variance
       - epistemic_maze
     deps:
       - scripts/epistemic_maze/convergence_analysis.py
@@ -431,16 +425,15 @@ stages:
       uv run python scripts/epistemic_maze/convergence_analysis.py
       --analysis scenario_curves
       --output-dir data/epistemic_maze/convergence
-      --n-opt-steps ${epistemic_maze.convergence.base_n_opt_steps}
-      --learning-rate ${epistemic_maze.convergence.base_learning_rate}
+      --n-opt-steps ${epistemic_maze.convergence.curves.n_optimization_steps}
+      --learning-rate ${epistemic_maze.convergence.curves.learning_rate}
       --n-theta ${epistemic_maze.n_theta}
       --horizon ${epistemic_maze.horizon}
       --goal-temperature ${epistemic_maze.goal_temperature}
       --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
-      --seed ${epistemic_maze.seed}
+      --seed ${epistemic_maze.convergence.curves.seed}
     params:
-      - epistemic_maze.convergence.base_n_opt_steps
-      - epistemic_maze.convergence.base_learning_rate
+      - epistemic_maze.convergence.curves
       - epistemic_maze
     deps:
       - scripts/epistemic_maze/convergence_analysis.py

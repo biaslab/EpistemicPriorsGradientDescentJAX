@@ -685,7 +685,7 @@ def temporal_vfe_jit(
             q_theta, q_x_theta_ep, q_u_given_x, bethe_trans,
             modality_groups, horizon, freeze_obs_and_transitions, include_bethe,
         )
-        vfe = vfe + planning_correction + epistemic_energy
+        vfe = vfe + epistemic_energy + planning_correction
     elif inference_mode == "planning":
         planning_correction = compute_planning_correction(
             q_u_given_x=q_u_given_x,
