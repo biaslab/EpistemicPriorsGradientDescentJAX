@@ -1,6 +1,6 @@
-# Running Temporal VFE Experiments on Snellius
+# Running Experiments on Snellius
 
-This guide explains how to run the three temporal VFE inference experiments — **active**, **marginal**, and **planning** — on the [Snellius](https://www.surf.nl/en/services/snellius-the-national-supercomputer) HPC cluster (SURF).
+This guide explains how to run T-maze, epistemic maze, and MiniGrid experiments on the [Snellius](https://www.surf.nl/en/services/snellius-the-national-supercomputer) HPC cluster (SURF).
 
 ## Prerequisites
 
@@ -22,38 +22,22 @@ cd EpistemicPriorsExperiments
 
 ```
 cluster/
-├── setup_env.sh          # Shared environment bootstrap (modules + venv)
-├── job_active.sh         # SLURM job: temporal VFE + epistemic priors
-├── job_marginal.sh       # SLURM job: temporal VFE without epistemic priors
-├── job_planning.sh       # SLURM job: temporal VFE + entropy priors
-├── job_convergence.sh    # SLURM job: convergence analysis
-├── job_aggregate.sh      # SLURM job: aggregate episode results
-└── submit_all.sh         # Submit all jobs at once
+├── setup_env.sh            # Shared environment bootstrap (modules + venv)
+├── submit_all.sh           # Submit jobs: all, or by environment
+├── submit_tmaze.sh         # Submit all T-maze stages
+├── submit_epistemic.sh     # Submit all epistemic maze stages
+├── job_tmaze.sh            # SLURM job: T-maze (convergence/experiment/figures)
+├── job_epistemic.sh        # SLURM job: epistemic maze (experiment/convergence/figures)
+├── job_active.sh           # SLURM job: MiniGrid active (array, per-episode)
+├── job_marginal.sh         # SLURM job: MiniGrid marginal (array, per-episode)
+├── job_planning.sh         # SLURM job: MiniGrid planning (array, per-episode)
+├── job_convergence.sh      # SLURM job: MiniGrid convergence
+└── job_aggregate.sh        # SLURM job: MiniGrid aggregate episode results
 ```
 
 ## Configuration
 
-All experiment parameters are controlled by `params.yaml` in the project root. The job scripts read from this file at runtime, so you only need to edit it once.
-
-Key parameters for the temporal VFE experiments:
-
-```yaml
-minigrid:
-  grid_size: 3                # MiniGrid DoorKey grid size
-  n_episodes: 10              # Number of episodes to run
-  max_steps: 12               # Maximum steps per episode
-  fov_size: 3                 # Field-of-view size
-  seed: 42                    # Random seed
-  goal_scale: 1.0             # Goal reward scaling
-  record: "first,last"        # Which episodes to record ("first,last", "all", "none")
-
-  planning_horizon: 12        # Policy planning horizon (timesteps)
-  n_optimization_steps: 1500  # Adam iterations per planning step
-  learning_rate: 0.01         # Optimizer learning rate
-  optimizer_type: "adafactor" # Optimizer type
-```
-
-Edit `params.yaml` before submitting jobs. All three temporal VFE jobs share the same parameters — only the `--inference-mode` flag differs between them.
+All experiment parameters are controlled by `params.yaml` in the project root. Job scripts read from this file at runtime, so you only need to edit it once.
 
 ## Environment setup
 
@@ -69,89 +53,115 @@ The script `cluster/setup_env.sh` handles module loading and virtual environment
 source cluster/setup_env.sh
 ```
 
-This creates the venv and installs all dependencies. You only need to do this once (or after changing dependencies).
+## Submitting jobs
 
-## Running individual experiments
-
-Each experiment has its own SLURM job script. All three use identical resource allocations:
-
-| Resource       | Value      |
-|----------------|------------|
-| Partition      | `gpu_a100` |
-| GPUs           | 1          |
-| CPUs per task  | 18         |
-| Memory         | 32 GB      |
-| Time limit     | 1 hour     |
-
-### Active inference
-
-Temporal VFE with epistemic priors (control, state, and observation priors for information-seeking behavior):
+### All environments
 
 ```bash
-sbatch cluster/job_active.sh
+bash cluster/submit_all.sh          # submit everything
+bash cluster/submit_all.sh tmaze    # T-maze only
+bash cluster/submit_all.sh epistemic # epistemic maze only
+bash cluster/submit_all.sh minigrid  # MiniGrid only
 ```
 
-- Job name: `aif-active`
-- Inference mode: `active`
-- Output directory: `data/minigrid/active/`
-- Logs: `logs/active_<jobid>.out` and `logs/active_<jobid>.err`
+### T-maze
 
-### Marginal inference
-
-Standard temporal VFE without epistemic priors (baseline — no information-seeking):
+T-maze stages are lightweight (seconds to minutes each). Each DVC stage runs as its own SLURM job — no array jobs needed.
 
 ```bash
-sbatch cluster/job_marginal.sh
+bash cluster/submit_tmaze.sh
 ```
 
-- Job name: `aif-marginal`
-- Inference mode: `marginal`
-- Output directory: `data/minigrid/marginal/`
-- Logs: `logs/marginal_<jobid>.out` and `logs/marginal_<jobid>.err`
+This submits 10 jobs:
 
-### Planning inference
+| Stage | Type | Dependencies |
+|-------|------|--------------|
+| 6 convergence analyses | GPU | None (parallel) |
+| 1 convergence figures | GPU | After all 6 convergence analyses |
+| 3 experiments (marginal, active, planning) | GPU | None (parallel) |
 
-Temporal VFE with entropy-based priors (prefer states with high observation entropy):
+```
+Parallel:                                    After all converge:
+  tm-conv-curves              ─┐
+  tm-conv-lr_sweep            ─┤
+  tm-conv-budget              ─┼─ afterok ──> tm-figures
+  tm-conv-variance            ─┤
+  tm-conv-policy_stability    ─┤
+  tm-conv-scenario_curves     ─┘
+  tm-exp-marginal    (independent)
+  tm-exp-active      (independent)
+  tm-exp-planning    (independent)
+```
+
+### Epistemic maze
+
+Similar to T-maze: one SLURM job per DVC stage.
 
 ```bash
-sbatch cluster/job_planning.sh
+bash cluster/submit_epistemic.sh
 ```
 
-- Job name: `aif-planning`
-- Inference mode: `planning`
-- Output directory: `data/minigrid/planning/`
-- Logs: `logs/planning_<jobid>.out` and `logs/planning_<jobid>.err`
+This submits 11 jobs:
 
-### What the job scripts do
+| Stage | Type | Dependencies |
+|-------|------|--------------|
+| 3 temporal experiments (planning, active, marginal) | GPU | None (parallel) |
+| 2 pymdp experiments (sophisticated, vanilla) | GPU | None (parallel) |
+| 5 convergence analyses | GPU | None (parallel) |
+| 1 convergence figures | GPU | After all 5 convergence analyses |
 
-Each job script follows the same structure:
+```
+Parallel:                                         After all converge:
+  ep-exp-planning   (temporal)
+  ep-exp-active     (temporal)
+  ep-exp-marginal   (temporal)
+  ep-exp-sophisticated (pymdp)
+  ep-exp-vanilla       (pymdp)
+  ep-conv-curves              ─┐
+  ep-conv-lr_sweep            ─┤
+  ep-conv-budget              ─┼─ afterok ──> ep-figures
+  ep-conv-variance            ─┤
+  ep-conv-scenario_curves     ─┘
+```
 
-1. Sets JAX/XLA environment variables (`JAX_PLATFORMS=gpu`, XLA Triton softmax fusion)
-2. Sources `cluster/setup_env.sh` to activate the GPU venv
-3. Reads all parameters from `params.yaml` using a Python YAML helper
-4. Runs `python scripts/minigrid/experiment.py` with the appropriate `--inference-mode` and all flags from `params.yaml`
+### MiniGrid
 
-All three jobs also pass `--freeze-obs-and-transitions` and `--receding-horizon` flags.
-
-## Running all experiments at once
-
-To submit all temporal VFE jobs (plus convergence) in parallel:
+MiniGrid episodes are expensive, so they use SLURM array jobs (1 task = 1 episode) with resume support and dependent aggregation.
 
 ```bash
-bash cluster/submit_all.sh
+bash cluster/submit_all.sh minigrid
 ```
 
-This submits 4 independent jobs and prints their job IDs:
+## Resource allocation
 
-```
-Submitting all jobs...
-  active:          12345
-  planning:        12346
-  marginal:        12347
-  convergence:     12350
-```
+| Environment | Stages | Partition | GPU | CPUs | Mem | Time |
+|---|---|---|---|---|---|---|
+| T-maze | all 10 | gpu_a100 | 1 | 18 | 16G | 30min |
+| Epistemic maze | all 11 | gpu_a100 | 1 | 18 | 16G | 30min |
+| MiniGrid episodes | 3 array jobs | gpu_a100 | 1 | 18 | 64G | 30min-1hr |
+| MiniGrid convergence | 1 job | gpu_a100 | 1 | 18 | 32G | 1hr |
+| MiniGrid aggregation | 3 jobs | gpu_a100 | 1 | 1 | 4G | 10min |
 
-All jobs run independently — there are no dependencies between them.
+## Running individual stages
+
+You can submit individual stages by passing env vars directly:
+
+```bash
+# Single T-maze convergence analysis
+sbatch --export=ALL,STAGE_TYPE=convergence,ANALYSIS=curves cluster/job_tmaze.sh
+
+# Single T-maze experiment
+sbatch --export=ALL,STAGE_TYPE=experiment,INFERENCE_MODE=active cluster/job_tmaze.sh
+
+# Single epistemic maze temporal experiment
+sbatch --export=ALL,STAGE_TYPE=experiment,STRATEGY=temporal,INFERENCE_MODE=active cluster/job_epistemic.sh
+
+# Single epistemic maze pymdp experiment
+sbatch --export=ALL,STAGE_TYPE=experiment,STRATEGY=sophisticated cluster/job_epistemic.sh
+
+# Single epistemic maze convergence analysis
+sbatch --export=ALL,STAGE_TYPE=convergence,ANALYSIS=lr_sweep cluster/job_epistemic.sh
+```
 
 ## Monitoring jobs
 
@@ -164,10 +174,8 @@ squeue -u $USER
 ### Follow log output in real time
 
 ```bash
-# Substitute the job ID printed at submission
-tail -f logs/active_12345.out
-tail -f logs/marginal_12346.out
-tail -f logs/planning_12347.out
+tail -f logs/tmaze_tm-conv-curves_12345.out
+tail -f logs/epistemic_ep-exp-planning_12346.out
 ```
 
 ### Cancel a job
@@ -181,22 +189,26 @@ scancel -u $USER
 
 ## Output structure
 
-Each experiment writes its results to a subdirectory under `data/minigrid/`:
-
 ```
-data/minigrid/
-├── active/
-│   ├── results.json          # Episode metrics (rewards, steps, VFE values)
-│   └── recordings/           # mp4 videos + per-frame PNGs
-├── marginal/
-│   ├── results.json
-│   └── recordings/
-└── planning/
-    ├── results.json
-    └── recordings/
+data/
+├── tmaze/
+│   ├── marginal/     # results.json, stats.json, episode.mp4, frames/
+│   ├── active/
+│   ├── planning/
+│   └── convergence/  # curves.json, lr_sweep.json, ..., figures/
+├── epistemic_maze/
+│   ├── planning/     # results.json
+│   ├── active/
+│   ├── marginal/
+│   ├── sophisticated/
+│   ├── vanilla/
+│   └── convergence/  # curves.json, lr_sweep.json, ..., figures/
+└── minigrid/
+    ├── active/       # episodes/, results.json, recordings/
+    ├── marginal/
+    ├── planning/
+    └── convergence/
 ```
-
-The `record` parameter in `params.yaml` controls which episodes get recorded. With `"first,last"`, only the first and last episodes produce video output.
 
 ## Troubleshooting
 
@@ -206,10 +218,9 @@ If `module load` fails, check available versions:
 
 ```bash
 module spider Python
-module spider CUDA
 ```
 
-The scripts expect `Python/3.11.3-GCCcore-12.3.0`. If unavailable, update the `PYTHON_MODULE` variable at the top of `cluster/setup_env.sh`.
+Update `PYTHON_MODULE` in `cluster/setup_env.sh` if needed.
 
 ### Venv creation fails on compute node
 
@@ -221,29 +232,19 @@ source cluster/setup_env.sh
 
 ### No GPU available / long queue times
 
-The `gpu` partition can be busy. Check queue status with:
-
 ```bash
 sinfo -p gpu
-```
-
-If wait times are long, you can check estimated start time:
-
-```bash
-squeue -u $USER --start
+squeue -u $USER --start    # estimated start time
 ```
 
 ### JAX does not see the GPU
 
 The job logs print JAX device info at the start. If you see `CpuDevice` instead of `GpuDevice`, verify that:
 
-1. The job is running on the `gpu` partition (check `#SBATCH --partition=gpu`)
-2. `jax[cuda12]` is installed in the venv (check `setup_env.sh` was sourced)
-3. `jax[cuda12]` is installed in the venv (`pip list | grep jax`)
+1. The job is running on the `gpu` partition
+2. `jax[cuda12]` is installed in the venv (`pip list | grep jax`)
 
 ### Stale venv after dependency changes
-
-If you update `pyproject.toml` or dependencies, delete and recreate the venv:
 
 ```bash
 rm -rf .venvs/venv-gpu
