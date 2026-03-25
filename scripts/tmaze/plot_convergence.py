@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import yaml
 
-script_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(script_dir))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 matplotlib.rcParams.update({
     "font.family": "serif",
@@ -46,7 +46,7 @@ SCENARIO_TITLES = {
 
 def load_colors():
     """Load color scheme from params.yaml."""
-    params_path = script_dir / "params.yaml"
+    params_path = project_root / "params.yaml"
     with open(params_path) as f:
         params = yaml.safe_load(f)
     return params.get("colors", {

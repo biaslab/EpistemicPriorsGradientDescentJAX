@@ -15,8 +15,8 @@ import sys
 import jax.numpy as jnp
 import yaml
 
-script_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(script_dir))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 from src.environments import TMaze, create_tmaze_tensors
 from src.planning import (
@@ -30,9 +30,9 @@ MODES = ["active", "marginal", "planning"]
 
 def load_params():
     """Load convergence parameters from params.yaml."""
-    params_path = script_dir / "params.yaml"
+    params_path = project_root / "params.yaml"
     with open(params_path) as f:
-        return yaml.safe_load(f)["convergence"]
+        return yaml.safe_load(f)["tmaze"]["convergence"]
 
 
 def run_episodes_with_losses(

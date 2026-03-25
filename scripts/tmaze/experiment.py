@@ -20,8 +20,8 @@ from tqdm import tqdm
 from pathlib import Path
 import sys
 
-script_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(script_dir))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 from src.environments import TMaze, create_tmaze_tensors
 from src.planning import (
@@ -331,7 +331,7 @@ def load_params_from_yaml(params_path: Path) -> dict:
     if params_path.exists():
         with open(params_path, 'r') as f:
             params = yaml.safe_load(f)
-        return params.get('experiment', {})
+        return params.get('tmaze', {}).get('experiment', {})
     return {}
 
 
@@ -358,7 +358,7 @@ def main():
     args = parser.parse_args()
     
     # Load defaults from params.yaml (for DVC pipeline)
-    params_path = script_dir / "params.yaml"
+    params_path = project_root / "params.yaml"
     yaml_params = load_params_from_yaml(params_path)
     
     # Merge: CLI args override yaml params, yaml params override hardcoded defaults
