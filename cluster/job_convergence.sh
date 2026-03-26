@@ -28,7 +28,7 @@ LEARNING_RATE=$(read_param "['minigrid']['learning_rate']")
 HORIZON=$(read_param "['minigrid']['planning_horizon']")
 SEED=$(read_param "['minigrid']['seed']")
 GOAL_SCALE=$(read_param "['minigrid']['goal_scale']")
-THRESHOLD=$(read_param "['convergence']['threshold']")
+THRESHOLD=$(read_param "['minigrid']['convergence']['threshold']")
 
 echo "Running convergence analysis on $(hostname)"
 python -c "import jax; print(f'JAX devices: {jax.devices()}')"
