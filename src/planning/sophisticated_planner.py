@@ -207,6 +207,95 @@ def convert_tensors_to_pymdp(
     return A, B, C, D
 
 
+def convert_tmaze_tensors_to_pymdp(
+    transition_tensor: Array,
+    reward_obs_tensor: Array,
+    goal_mapping: Array,
+    theta_prior: Array,
+    goal_temperature: float = 1.0,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Convert T-Maze tensors to pymdp format.
+
+    The T-Maze has 5 locations, 4 actions, and 2 theta values (reward left/right).
+    We model it with two state factors: location (5) and theta (2).
+
+    Args:
+        transition_tensor: p(s'|s,a) shape (5, 5, 4)
+        reward_obs_tensor: p(cue|location, reward_loc) shape (2, 5, 2)
+        goal_mapping: p(goal|state, reward_loc) shape (5, 2)
+        theta_prior: p(theta) shape (2,)
+        goal_temperature: Scaling factor for reward preferences in C matrix
+
+    Returns:
+        A, B, C, D in pymdp obj_array format
+    """
+    n_states = 5
+    n_actions = 4
+    n_theta = 2
+
+    transition_np = np.array(transition_tensor)
+    reward_obs_np = np.array(reward_obs_tensor)
+    theta_prior_np = np.array(theta_prior)
+
+    # ==================== A MATRICES (Observation Likelihood) ====================
+    # 3 modalities: location, cue, reward
+    A = pymdp_utils.obj_array(3)
+
+    # A[0]: Location observations - shape (5, 5, 2)
+    # Deterministic identity, replicated across theta
+    A[0] = np.zeros((n_states, n_states, n_theta))
+    for theta_idx in range(n_theta):
+        A[0][:, :, theta_idx] = np.eye(n_states)
+
+    # A[1]: Cue observations - shape (2, 5, 2)
+    # Directly from reward_obs_tensor (already correct format)
+    A[1] = reward_obs_np.copy()
+
+    # A[2]: Reward observations - shape (3, 5, 2)
+    # 0=no_reward, 1=correct_goal, 2=wrong_goal
+    n_reward_obs = 3
+    A[2] = np.zeros((n_reward_obs, n_states, n_theta))
+    for s in range(n_states):
+        for theta_idx in range(n_theta):
+            if s == 2:  # TOP_LEFT
+                if theta_idx == 0:  # reward=left -> correct
+                    A[2][1, s, theta_idx] = 1.0
+                else:  # reward=right -> wrong
+                    A[2][2, s, theta_idx] = 1.0
+            elif s == 4:  # TOP_RIGHT
+                if theta_idx == 1:  # reward=right -> correct
+                    A[2][1, s, theta_idx] = 1.0
+                else:  # reward=left -> wrong
+                    A[2][2, s, theta_idx] = 1.0
+            else:
+                A[2][0, s, theta_idx] = 1.0  # no reward
+
+    # ==================== B MATRICES (Transition Dynamics) ====================
+    B = pymdp_utils.obj_array(2)
+
+    # B[0]: Location transitions - shape (5, 5, 4)
+    B[0] = transition_np.copy()
+
+    # B[1]: Theta transitions - identity (theta never changes)
+    B[1] = np.zeros((n_theta, n_theta, 1))
+    B[1][:, :, 0] = np.eye(n_theta)
+
+    # ==================== C VECTORS (Preferences) ====================
+    C = pymdp_utils.obj_array(3)
+    C[0] = np.zeros(n_states)  # Neutral location preferences
+    C[1] = np.zeros(2)  # Neutral cue preferences
+    C[2] = np.array([0.0, goal_temperature * 1.0, -goal_temperature * 1.0])
+
+    # ==================== D VECTORS (State Priors) ====================
+    D = pymdp_utils.obj_array(2)
+    D[0] = np.zeros(n_states)
+    D[0][1] = 1.0  # Start at MIDDLE (state 1)
+    D[1] = theta_prior_np.copy()
+
+    return A, B, C, D
+
+
 def create_goal_preferences_from_mapping(
     goal_mapping: Array,
     n_theta: int,
@@ -294,7 +383,41 @@ class SophisticatedPlanner:
             goal_temperature=config.goal_temperature,
         )
 
-        # Construct policies and policy prior from action_prior (no learning)
+        self._build_agent()
+
+    @classmethod
+    def from_pymdp_arrays(
+        cls,
+        A: np.ndarray,
+        B: np.ndarray,
+        C: np.ndarray,
+        D: np.ndarray,
+        config: SophisticatedPlanningConfig,
+    ) -> "SophisticatedPlanner":
+        """
+        Create a planner from pre-converted pymdp A/B/C/D matrices.
+
+        Use this when the tensor conversion is done externally (e.g. for T-Maze).
+        """
+        instance = object.__new__(cls)
+        instance.config = config
+        instance.n_states = config.n_states
+        instance.n_actions = config.n_actions
+        instance.n_theta = config.n_theta
+        instance.goal_mapping = None
+        instance.action_prior = None
+        instance.A = A
+        instance.B = B
+        instance.C = C
+        instance.D = D
+        instance._build_agent()
+        return instance
+
+    def _build_agent(self) -> None:
+        """Construct pymdp Agent from self.A, self.B, self.C, self.D."""
+        config = self.config
+
+        # Construct policies
         control_fac_idx = [0]  # Only factor 0 (state) is controllable
         num_controls = [self.B[0].shape[-1], self.B[1].shape[-1]]
         policies = pymdp_control.construct_policies(
@@ -308,15 +431,6 @@ class SophisticatedPlanner:
         E = np.ones(len(policies)) / len(policies)
 
         # Create pymdp agent
-        # Following pymdp cue_chaining_demo pattern:
-        # - Agent infers num_controls from B matrix shapes
-        # - policy_len=1 for single-step policies with re-planning each step
-        # - control_fac_idx specifies controllable factors (only factor 0)
-        # - sophisticated=True enables tree-search based planning
-        #
-        # B matrix shapes encode control structure:
-        # - B[0]: (35, 35, 8) - 8 actions for state factor
-        # - B[1]: (n_theta, n_theta, 1) - 1 "no-op" for theta factor
         self.agent = Agent(
             A=self.A,
             B=self.B,
@@ -332,7 +446,7 @@ class SophisticatedPlanner:
             use_states_info_gain=config.use_states_info_gain,
             use_param_info_gain=config.use_param_info_gain,
             action_selection=config.action_selection,
-            sophisticated=config.sophisticated,  # Tree-search (True) or vanilla EFE (False)
+            sophisticated=config.sophisticated,
             si_horizon=config.inference_horizon if config.sophisticated else 1,
             si_policy_prune_threshold=1e-1,
             si_state_prune_threshold=1e-1,

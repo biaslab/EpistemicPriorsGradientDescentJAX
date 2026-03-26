@@ -18,6 +18,7 @@ from .sophisticated_planner import (
     SophisticatedPlanningConfig,
     SophisticatedPlanningResult,
     SophisticatedPlanner,
+    convert_tmaze_tensors_to_pymdp,
 )
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     "SophisticatedPlanningConfig",
     "SophisticatedPlanningResult",
     "SophisticatedPlanner",
+    "convert_tmaze_tensors_to_pymdp",
 ]

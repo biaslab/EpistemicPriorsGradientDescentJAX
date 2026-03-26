@@ -152,6 +152,34 @@ stages:
       - data/tmaze/planning/episode.mp4
       - data/tmaze/planning/frames
 
+  tmaze_experiment_sophisticated:
+    cmd: uv run python scripts/tmaze/experiment.py --strategy sophisticated --output-dir data/tmaze/sophisticated --no-video --no-tikz
+    params:
+      - tmaze.experiment.n_episodes
+      - tmaze.experiment.max_steps
+      - tmaze.experiment.seed
+    deps:
+      - scripts/tmaze/experiment.py
+      - src/environments/tmaze.py
+      - src/planning/sophisticated_planner.py
+    outs:
+      - data/tmaze/sophisticated/results.json
+      - data/tmaze/sophisticated/stats.json
+
+  tmaze_experiment_vanilla:
+    cmd: uv run python scripts/tmaze/experiment.py --strategy vanilla --output-dir data/tmaze/vanilla --no-video --no-tikz
+    params:
+      - tmaze.experiment.n_episodes
+      - tmaze.experiment.max_steps
+      - tmaze.experiment.seed
+    deps:
+      - scripts/tmaze/experiment.py
+      - src/environments/tmaze.py
+      - src/planning/sophisticated_planner.py
+    outs:
+      - data/tmaze/vanilla/results.json
+      - data/tmaze/vanilla/stats.json
+
   # ==================== Epistemic Maze ====================
 
   epistemic_planning:
