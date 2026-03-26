@@ -55,6 +55,5 @@ python scripts/minigrid/experiment.py \
     --goal-scale "$GOAL_SCALE" \
     --record "$RECORD" \
     --output-dir data/minigrid/marginal \
-    --episode-index "$SLURM_ARRAY_TASK_ID" \
-    --no-orientation
+    --episode-index "$SLURM_ARRAY_TASK_ID" 
 
