@@ -1,84 +1,489 @@
 stages:
-  convergence_analysis:
-    cmd: uv run python scripts/convergence_analysis.py --output-dir data/convergence 
+  tmaze_convergence_curves:
+    cmd: uv run python scripts/tmaze/convergence_analysis.py --analysis curves --output-dir data/tmaze/convergence
     params:
-      - experiment.n_optimization_steps
-      - experiment.planning_horizon
+      - tmaze.convergence.curves
     deps:
-      - scripts/convergence_analysis.py
+      - scripts/tmaze/convergence_analysis.py
       - src/environments/tmaze.py
       - src/planning/factorized_optimizer.py
       - src/objectives/factorized_vfe.py
     outs:
-      - data/convergence/convergence.png
-      - data/convergence/convergence.tex
-      - data/convergence/convergence_data.csv
-      - data/convergence/policy_stability.png
-      - data/convergence/policy_stability.tex
-      - data/convergence/policy_stability.csv
+      - data/tmaze/convergence/curves.json
 
-  experiment_marginal:
-    cmd: uv run python scripts/tmaze_experiment.py --inference-mode marginal --output-dir data/marginal
+  tmaze_convergence_lr_sweep:
+    cmd: uv run python scripts/tmaze/convergence_analysis.py --analysis lr_sweep --output-dir data/tmaze/convergence
     params:
-      - experiment.n_episodes
-      - experiment.max_steps
-      - experiment.planning_horizon
-      - experiment.receding_horizon
-      - experiment.n_optimization_steps
-      - experiment.learning_rate
-      - experiment.seed
+      - tmaze.convergence.lr_sweep
     deps:
-      - scripts/tmaze_experiment.py
+      - scripts/tmaze/convergence_analysis.py
+      - src/environments/tmaze.py
+      - src/planning/factorized_optimizer.py
+      - src/objectives/factorized_vfe.py
+    outs:
+      - data/tmaze/convergence/lr_sweep.json
+
+  tmaze_convergence_budget:
+    cmd: uv run python scripts/tmaze/convergence_analysis.py --analysis budget --output-dir data/tmaze/convergence
+    params:
+      - tmaze.convergence.budget
+    deps:
+      - scripts/tmaze/convergence_analysis.py
+      - src/environments/tmaze.py
+      - src/planning/factorized_optimizer.py
+      - src/objectives/factorized_vfe.py
+    outs:
+      - data/tmaze/convergence/budget.json
+
+  tmaze_convergence_variance:
+    cmd: uv run python scripts/tmaze/convergence_analysis.py --analysis variance --output-dir data/tmaze/convergence
+    params:
+      - tmaze.convergence.variance
+    deps:
+      - scripts/tmaze/convergence_analysis.py
+      - src/environments/tmaze.py
+      - src/planning/factorized_optimizer.py
+      - src/objectives/factorized_vfe.py
+    outs:
+      - data/tmaze/convergence/variance.json
+
+  tmaze_convergence_policy_stability:
+    cmd: uv run python scripts/tmaze/convergence_analysis.py --analysis policy_stability --output-dir data/tmaze/convergence
+    params:
+      - tmaze.convergence.policy_stability
+    deps:
+      - scripts/tmaze/convergence_analysis.py
+      - src/environments/tmaze.py
+      - src/planning/factorized_optimizer.py
+      - src/objectives/factorized_vfe.py
+    outs:
+      - data/tmaze/convergence/policy_stability.json
+
+  tmaze_convergence_scenario_curves:
+    cmd: uv run python scripts/tmaze/convergence_analysis.py --analysis scenario_curves --output-dir data/tmaze/convergence
+    params:
+      - tmaze.convergence.scenario_curves
+    deps:
+      - scripts/tmaze/convergence_analysis.py
+      - src/environments/tmaze.py
+      - src/planning/factorized_optimizer.py
+      - src/objectives/factorized_vfe.py
+    outs:
+      - data/tmaze/convergence/scenario_curves.json
+
+  tmaze_convergence_figures:
+    cmd: uv run python scripts/tmaze/plot_convergence.py --input-dir data/tmaze/convergence --output-dir data/tmaze/convergence/figures
+    params:
+      - colors
+    deps:
+      - scripts/tmaze/plot_convergence.py
+      - data/tmaze/convergence/curves.json
+      - data/tmaze/convergence/lr_sweep.json
+      - data/tmaze/convergence/budget.json
+      - data/tmaze/convergence/variance.json
+      - data/tmaze/convergence/policy_stability.json
+      - data/tmaze/convergence/scenario_curves.json
+    outs:
+      - data/tmaze/convergence/figures
+
+  tmaze_experiment_marginal:
+    cmd: uv run python scripts/tmaze/experiment.py --inference-mode marginal --output-dir data/tmaze/marginal
+    params:
+      - tmaze.experiment.n_episodes
+      - tmaze.experiment.max_steps
+      - tmaze.experiment.planning_horizon
+      - tmaze.experiment.receding_horizon
+      - tmaze.experiment.n_optimization_steps
+      - tmaze.experiment.learning_rate
+      - tmaze.experiment.seed
+    deps:
+      - scripts/tmaze/experiment.py
       - src/environments/tmaze.py
       - src/planning/factorized_optimizer.py
       - src/objectives/factorized_vfe.py
       - src/visualization/tmaze_viz.py
     outs:
-      - data/marginal/results.json
-      - data/marginal/stats.json
-      - data/marginal/episode.mp4
-      - data/marginal/frames
+      - data/tmaze/marginal/results.json
+      - data/tmaze/marginal/stats.json
+      - data/tmaze/marginal/episode.mp4
+      - data/tmaze/marginal/frames
 
-  experiment_active:
-    cmd: uv run python scripts/tmaze_experiment.py --inference-mode active --output-dir data/active
+  tmaze_experiment_active:
+    cmd: uv run python scripts/tmaze/experiment.py --inference-mode active --output-dir data/tmaze/active
     params:
-      - experiment.n_episodes
-      - experiment.max_steps
-      - experiment.planning_horizon
-      - experiment.receding_horizon
-      - experiment.n_optimization_steps
-      - experiment.learning_rate
-      - experiment.seed
+      - tmaze.experiment.n_episodes
+      - tmaze.experiment.max_steps
+      - tmaze.experiment.planning_horizon
+      - tmaze.experiment.receding_horizon
+      - tmaze.experiment.n_optimization_steps
+      - tmaze.experiment.learning_rate
+      - tmaze.experiment.seed
     deps:
-      - scripts/tmaze_experiment.py
+      - scripts/tmaze/experiment.py
       - src/environments/tmaze.py
       - src/planning/factorized_optimizer.py
       - src/objectives/factorized_vfe.py
       - src/visualization/tmaze_viz.py
     outs:
-      - data/active/results.json
-      - data/active/stats.json
-      - data/active/episode.mp4
-      - data/active/frames
+      - data/tmaze/active/results.json
+      - data/tmaze/active/stats.json
+      - data/tmaze/active/episode.mp4
+      - data/tmaze/active/frames
 
-  experiment_planning:
-    cmd: uv run python scripts/tmaze_experiment.py --inference-mode planning --output-dir data/planning
+  tmaze_experiment_planning:
+    cmd: uv run python scripts/tmaze/experiment.py --inference-mode planning --output-dir data/tmaze/planning
     params:
-      - experiment.n_episodes
-      - experiment.max_steps
-      - experiment.planning_horizon
-      - experiment.receding_horizon
-      - experiment.n_optimization_steps
-      - experiment.learning_rate
-      - experiment.seed
+      - tmaze.experiment.n_episodes
+      - tmaze.experiment.max_steps
+      - tmaze.experiment.planning_horizon
+      - tmaze.experiment.receding_horizon
+      - tmaze.experiment.n_optimization_steps
+      - tmaze.experiment.learning_rate
+      - tmaze.experiment.seed
     deps:
-      - scripts/tmaze_experiment.py
+      - scripts/tmaze/experiment.py
       - src/environments/tmaze.py
       - src/planning/factorized_optimizer.py
       - src/objectives/factorized_vfe.py
       - src/visualization/tmaze_viz.py
     outs:
-      - data/planning/results.json
-      - data/planning/stats.json
-      - data/planning/episode.mp4
-      - data/planning/frames
+      - data/tmaze/planning/results.json
+      - data/tmaze/planning/stats.json
+      - data/tmaze/planning/episode.mp4
+      - data/tmaze/planning/frames
+
+  tmaze_experiment_sophisticated:
+    cmd: uv run python scripts/tmaze/experiment.py --strategy sophisticated --output-dir data/tmaze/sophisticated --no-video --no-tikz
+    params:
+      - tmaze.experiment.n_episodes
+      - tmaze.experiment.max_steps
+      - tmaze.experiment.seed
+    deps:
+      - scripts/tmaze/experiment.py
+      - src/environments/tmaze.py
+      - src/planning/sophisticated_planner.py
+    outs:
+      - data/tmaze/sophisticated/results.json
+      - data/tmaze/sophisticated/stats.json
+
+  tmaze_experiment_vanilla:
+    cmd: uv run python scripts/tmaze/experiment.py --strategy vanilla --output-dir data/tmaze/vanilla --no-video --no-tikz
+    params:
+      - tmaze.experiment.n_episodes
+      - tmaze.experiment.max_steps
+      - tmaze.experiment.seed
+    deps:
+      - scripts/tmaze/experiment.py
+      - src/environments/tmaze.py
+      - src/planning/sophisticated_planner.py
+    outs:
+      - data/tmaze/vanilla/results.json
+      - data/tmaze/vanilla/stats.json
+
+  # ==================== Epistemic Maze ====================
+
+  epistemic_planning:
+    cmd: >
+      uv run python scripts/epistemic_maze/experiment.py
+      --strategy temporal
+      --inference-mode planning
+      --output-dir data/epistemic_maze
+      --n-episodes ${epistemic_maze.n_episodes}
+      --horizon ${epistemic_maze.horizon}
+      --max-steps ${epistemic_maze.max_steps}
+      --n-opt-steps ${epistemic_maze.n_optimization_steps}
+      --learning-rate ${epistemic_maze.learning_rate}
+      --n-theta ${epistemic_maze.n_theta}
+      --goal-temperature ${epistemic_maze.goal_temperature}
+      --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
+      --seed ${epistemic_maze.seed}
+    params:
+      - epistemic_maze.n_episodes
+      - epistemic_maze.horizon
+      - epistemic_maze.max_steps
+      - epistemic_maze.receding_horizon
+      - epistemic_maze.n_optimization_steps
+      - epistemic_maze.learning_rate
+      - epistemic_maze.n_theta
+      - epistemic_maze.goal_temperature
+      - epistemic_maze.cue_observation_accuracy
+      - epistemic_maze.location_observation_accuracy
+      - epistemic_maze.cue_cost_epsilon
+      - epistemic_maze.seed
+    deps:
+      - scripts/epistemic_maze/experiment.py
+      - src/environments/epistemic_maze.py
+      - src/planning/temporal_optimizer.py
+      - src/objectives/temporal_vfe.py
+    outs:
+      - data/epistemic_maze/planning/results.json
+
+  epistemic_active:
+    cmd: >
+      uv run python scripts/epistemic_maze/experiment.py
+      --strategy temporal
+      --inference-mode active
+      --output-dir data/epistemic_maze
+      --n-episodes ${epistemic_maze.n_episodes}
+      --horizon ${epistemic_maze.horizon}
+      --max-steps ${epistemic_maze.max_steps}
+      --n-opt-steps ${epistemic_maze.n_optimization_steps}
+      --learning-rate ${epistemic_maze.learning_rate}
+      --n-theta ${epistemic_maze.n_theta}
+      --goal-temperature ${epistemic_maze.goal_temperature}
+      --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
+      --seed ${epistemic_maze.seed}
+    params:
+      - epistemic_maze.n_episodes
+      - epistemic_maze.horizon
+      - epistemic_maze.max_steps
+      - epistemic_maze.receding_horizon
+      - epistemic_maze.n_optimization_steps
+      - epistemic_maze.learning_rate
+      - epistemic_maze.n_theta
+      - epistemic_maze.goal_temperature
+      - epistemic_maze.cue_observation_accuracy
+      - epistemic_maze.location_observation_accuracy
+      - epistemic_maze.cue_cost_epsilon
+      - epistemic_maze.seed
+    deps:
+      - scripts/epistemic_maze/experiment.py
+      - src/environments/epistemic_maze.py
+      - src/planning/temporal_optimizer.py
+      - src/objectives/temporal_vfe.py
+    outs:
+      - data/epistemic_maze/active/results.json
+
+  epistemic_marginal:
+    cmd: >
+      uv run python scripts/epistemic_maze/experiment.py
+      --strategy temporal
+      --inference-mode marginal
+      --output-dir data/epistemic_maze
+      --n-episodes ${epistemic_maze.n_episodes}
+      --horizon ${epistemic_maze.horizon}
+      --max-steps ${epistemic_maze.max_steps}
+      --n-opt-steps ${epistemic_maze.n_optimization_steps}
+      --learning-rate ${epistemic_maze.learning_rate}
+      --n-theta ${epistemic_maze.n_theta}
+      --goal-temperature ${epistemic_maze.goal_temperature}
+      --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
+      --seed ${epistemic_maze.seed}
+    params:
+      - epistemic_maze.n_episodes
+      - epistemic_maze.horizon
+      - epistemic_maze.max_steps
+      - epistemic_maze.receding_horizon
+      - epistemic_maze.n_optimization_steps
+      - epistemic_maze.learning_rate
+      - epistemic_maze.n_theta
+      - epistemic_maze.goal_temperature
+      - epistemic_maze.cue_observation_accuracy
+      - epistemic_maze.location_observation_accuracy
+      - epistemic_maze.cue_cost_epsilon
+      - epistemic_maze.seed
+    deps:
+      - scripts/epistemic_maze/experiment.py
+      - src/environments/epistemic_maze.py
+      - src/planning/temporal_optimizer.py
+      - src/objectives/temporal_vfe.py
+    outs:
+      - data/epistemic_maze/marginal/results.json
+
+  epistemic_sophisticated:
+    cmd: >
+      uv run python scripts/epistemic_maze/experiment.py
+      --strategy sophisticated
+      --output-dir data/epistemic_maze
+      --n-episodes ${epistemic_maze.n_episodes}
+      --horizon ${epistemic_maze.horizon}
+      --max-steps ${epistemic_maze.max_steps}
+      --n-theta ${epistemic_maze.n_theta}
+      --goal-temperature ${epistemic_maze.goal_temperature}
+      --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
+      --seed ${epistemic_maze.seed}
+    params:
+      - epistemic_maze.n_episodes
+      - epistemic_maze.horizon
+      - epistemic_maze.max_steps
+      - epistemic_maze.n_theta
+      - epistemic_maze.goal_temperature
+      - epistemic_maze.cue_observation_accuracy
+      - epistemic_maze.location_observation_accuracy
+      - epistemic_maze.cue_cost_epsilon
+      - epistemic_maze.seed
+    deps:
+      - scripts/epistemic_maze/experiment.py
+      - src/environments/epistemic_maze.py
+      - src/planning/sophisticated_planner.py
+    outs:
+      - data/epistemic_maze/sophisticated/results.json
+
+  epistemic_vanilla:
+    cmd: >
+      uv run python scripts/epistemic_maze/experiment.py
+      --strategy vanilla
+      --output-dir data/epistemic_maze
+      --n-episodes ${epistemic_maze.n_episodes}
+      --horizon ${epistemic_maze.horizon}
+      --max-steps ${epistemic_maze.max_steps}
+      --n-theta ${epistemic_maze.n_theta}
+      --goal-temperature ${epistemic_maze.goal_temperature}
+      --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
+      --seed ${epistemic_maze.seed}
+    params:
+      - epistemic_maze.n_episodes
+      - epistemic_maze.n_theta
+      - epistemic_maze.goal_temperature
+      - epistemic_maze.cue_observation_accuracy
+      - epistemic_maze.location_observation_accuracy
+      - epistemic_maze.cue_cost_epsilon
+      - epistemic_maze.seed
+    deps:
+      - scripts/epistemic_maze/experiment.py
+      - src/environments/epistemic_maze.py
+      - src/planning/sophisticated_planner.py
+    outs:
+      - data/epistemic_maze/vanilla/results.json
+
+  epistemic_convergence_curves:
+    cmd: >
+      uv run python scripts/epistemic_maze/convergence_analysis.py
+      --analysis curves
+      --output-dir data/epistemic_maze/convergence
+      --n-episodes ${epistemic_maze.convergence.curves.n_episodes}
+      --n-opt-steps ${epistemic_maze.convergence.curves.n_optimization_steps}
+      --learning-rate ${epistemic_maze.convergence.curves.learning_rate}
+      --n-theta ${epistemic_maze.n_theta}
+      --horizon ${epistemic_maze.horizon}
+      --max-steps ${epistemic_maze.max_steps}
+      --goal-temperature ${epistemic_maze.goal_temperature}
+      --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
+      --seed ${epistemic_maze.convergence.curves.seed}
+    params:
+      - epistemic_maze.convergence.curves
+      - epistemic_maze
+    deps:
+      - scripts/epistemic_maze/convergence_analysis.py
+      - scripts/epistemic_maze/experiment.py
+      - src/environments/epistemic_maze.py
+      - src/planning/temporal_optimizer.py
+      - src/objectives/temporal_vfe.py
+    outs:
+      - data/epistemic_maze/convergence/curves.json
+
+  epistemic_convergence_lr_sweep:
+    cmd: >
+      uv run python scripts/epistemic_maze/convergence_analysis.py
+      --analysis lr_sweep
+      --output-dir data/epistemic_maze/convergence
+      --n-episodes ${epistemic_maze.convergence.lr_sweep.n_episodes}
+      --n-opt-steps ${epistemic_maze.convergence.lr_sweep.n_optimization_steps}
+      --n-theta ${epistemic_maze.n_theta}
+      --horizon ${epistemic_maze.horizon}
+      --max-steps ${epistemic_maze.max_steps}
+      --goal-temperature ${epistemic_maze.goal_temperature}
+      --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
+      --seed ${epistemic_maze.convergence.lr_sweep.seed}
+    params:
+      - epistemic_maze.convergence.lr_sweep
+      - epistemic_maze
+    deps:
+      - scripts/epistemic_maze/convergence_analysis.py
+      - scripts/epistemic_maze/experiment.py
+      - src/environments/epistemic_maze.py
+      - src/planning/temporal_optimizer.py
+      - src/objectives/temporal_vfe.py
+    outs:
+      - data/epistemic_maze/convergence/lr_sweep.json
+
+  epistemic_convergence_budget:
+    cmd: >
+      uv run python scripts/epistemic_maze/convergence_analysis.py
+      --analysis budget
+      --output-dir data/epistemic_maze/convergence
+      --n-episodes ${epistemic_maze.convergence.budget.n_episodes}
+      --learning-rate ${epistemic_maze.convergence.budget.learning_rate}
+      --n-theta ${epistemic_maze.n_theta}
+      --horizon ${epistemic_maze.horizon}
+      --max-steps ${epistemic_maze.max_steps}
+      --goal-temperature ${epistemic_maze.goal_temperature}
+      --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
+      --seed ${epistemic_maze.convergence.budget.seed}
+    params:
+      - epistemic_maze.convergence.budget
+      - epistemic_maze
+    deps:
+      - scripts/epistemic_maze/convergence_analysis.py
+      - scripts/epistemic_maze/experiment.py
+      - src/environments/epistemic_maze.py
+      - src/planning/temporal_optimizer.py
+      - src/objectives/temporal_vfe.py
+    outs:
+      - data/epistemic_maze/convergence/budget.json
+
+  epistemic_convergence_variance:
+    cmd: >
+      uv run python scripts/epistemic_maze/convergence_analysis.py
+      --analysis variance
+      --output-dir data/epistemic_maze/convergence
+      --n-episodes ${epistemic_maze.convergence.variance.n_episodes}
+      --n-opt-steps ${epistemic_maze.convergence.variance.n_optimization_steps}
+      --learning-rate ${epistemic_maze.convergence.variance.learning_rate}
+      --n-theta ${epistemic_maze.n_theta}
+      --horizon ${epistemic_maze.horizon}
+      --max-steps ${epistemic_maze.max_steps}
+      --goal-temperature ${epistemic_maze.goal_temperature}
+      --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
+      --seed ${epistemic_maze.seed}
+    params:
+      - epistemic_maze.convergence.variance
+      - epistemic_maze
+    deps:
+      - scripts/epistemic_maze/convergence_analysis.py
+      - scripts/epistemic_maze/experiment.py
+      - src/environments/epistemic_maze.py
+      - src/planning/temporal_optimizer.py
+      - src/objectives/temporal_vfe.py
+    outs:
+      - data/epistemic_maze/convergence/variance.json
+
+  epistemic_convergence_scenario_curves:
+    cmd: >
+      uv run python scripts/epistemic_maze/convergence_analysis.py
+      --analysis scenario_curves
+      --output-dir data/epistemic_maze/convergence
+      --n-opt-steps ${epistemic_maze.convergence.curves.n_optimization_steps}
+      --learning-rate ${epistemic_maze.convergence.curves.learning_rate}
+      --n-theta ${epistemic_maze.n_theta}
+      --horizon ${epistemic_maze.horizon}
+      --goal-temperature ${epistemic_maze.goal_temperature}
+      --cue-accuracy ${epistemic_maze.cue_observation_accuracy}
+      --seed ${epistemic_maze.convergence.curves.seed}
+    params:
+      - epistemic_maze.convergence.curves
+      - epistemic_maze
+    deps:
+      - scripts/epistemic_maze/convergence_analysis.py
+      - src/environments/epistemic_maze.py
+      - src/planning/temporal_optimizer.py
+      - src/objectives/temporal_vfe.py
+    outs:
+      - data/epistemic_maze/convergence/scenario_curves.json
+
+  epistemic_convergence_figures:
+    cmd: >
+      uv run python scripts/epistemic_maze/plot_convergence.py
+      --input-dir data/epistemic_maze/convergence
+      --output-dir data/epistemic_maze/convergence/figures
+    deps:
+      - scripts/epistemic_maze/plot_convergence.py
+      - data/epistemic_maze/convergence/curves.json
+      - data/epistemic_maze/convergence/lr_sweep.json
+      - data/epistemic_maze/convergence/budget.json
+      - data/epistemic_maze/convergence/variance.json
+      - data/epistemic_maze/convergence/scenario_curves.json
+    params:
+      - colors
+    outs:
+      - data/epistemic_maze/convergence/figures/

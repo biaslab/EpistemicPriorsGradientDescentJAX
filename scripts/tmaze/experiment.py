@@ -20,14 +20,17 @@ from tqdm import tqdm
 from pathlib import Path
 import sys
 
-script_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(script_dir))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 from src.environments import TMaze, create_tmaze_tensors
 from src.planning import (
     plan_actions_factorized,
     select_action_factorized,
     FactorizedPlanningConfig,
+    SophisticatedPlanningConfig,
+    SophisticatedPlanner,
+    convert_tmaze_tensors_to_pymdp,
 )
 from src.visualization import (
     plot_tmaze_frame,
@@ -70,6 +73,117 @@ class EpisodeResult:
     final_state: int
     reward_location: str = ""  # 'left' or 'right'
     planning_history: Optional[List[PlanningSnapshot]] = None  # Planning snapshots at each step
+
+
+def get_observation_tmaze(env: TMaze, is_final_step: bool = False) -> list:
+    """
+    Convert T-Maze environment state to pymdp observation indices.
+
+    Returns list of [location_obs_idx, cue_obs_idx, reward_obs_idx].
+    """
+    # Location observation: deterministic (T-Maze has perfect location obs)
+    location_obs_idx = env.agent_state
+
+    # Cue observation: informative at BOTTOM (state 0), ambiguous elsewhere
+    if env.agent_state == 0:  # BOTTOM/cue location
+        cue_obs_idx = 0 if env.reward_location == 'left' else 1
+    else:
+        # Ambiguous: both cue indices are equally likely (A[1] = 0.5 at non-cue locations)
+        cue_obs_idx = random.randint(0, 1)
+
+    # Reward observation: only reveal at final step
+    if is_final_step:
+        if env.agent_state == 2:  # TOP_LEFT
+            reward_obs_idx = 1 if env.reward_location == 'left' else 2
+        elif env.agent_state == 4:  # TOP_RIGHT
+            reward_obs_idx = 1 if env.reward_location == 'right' else 2
+        else:
+            reward_obs_idx = 0  # no reward
+    else:
+        reward_obs_idx = None  # skip reward belief update during episode
+
+    return [location_obs_idx, cue_obs_idx, reward_obs_idx]
+
+
+def run_episode_pymdp(
+    env: TMaze,
+    transition_tensor: Array,
+    observation_tensor: Array,
+    goal_mapping: Array,
+    config: SophisticatedPlanningConfig,
+    max_steps: int = 4,
+    verbose: bool = False,
+) -> EpisodeResult:
+    """Run a single T-Maze episode using pymdp active inference."""
+    import numpy as np
+
+    trajectory = [env.agent_state]
+    actions = []
+    total_reward = 0.0
+
+    # Convert tensors to pymdp format
+    theta_prior = jnp.array([0.5, 0.5])
+    A, B, C, D = convert_tmaze_tensors_to_pymdp(
+        transition_tensor=transition_tensor,
+        reward_obs_tensor=observation_tensor,
+        goal_mapping=goal_mapping,
+        theta_prior=theta_prior,
+        goal_temperature=config.goal_temperature,
+    )
+
+    # Create planner
+    planner = SophisticatedPlanner.from_pymdp_arrays(A, B, C, D, config)
+    planner.agent.reset()
+
+    # Get initial observation
+    obs = get_observation_tmaze(env, is_final_step=False)
+
+    for step in range(max_steps):
+        # 1) Infer states from observation
+        planner.infer_states(obs)
+
+        # Receding horizon
+        remaining = min(max_steps - step, config.inference_horizon)
+        if config.sophisticated:
+            if hasattr(planner.agent, "si_horizon"):
+                planner.agent.si_horizon = remaining
+        else:
+            planner.rebuild_policies(remaining)
+
+        # 2) Infer policies (compute EFE)
+        q_pi, efe = planner.infer_policies()
+
+        # 3) Sample action
+        action_arr = planner.sample_action()
+        action = int(action_arr[0])
+
+        if verbose:
+            q_theta = planner.agent.qs[1]
+            print(f"  Step {step}: State={env.agent_state}, Action={action}")
+            print(f"    q(theta)={q_theta}")
+
+        # 4) Execute action
+        _, _, reward, done = env.step(action)
+        total_reward += reward
+        trajectory.append(env.agent_state)
+        actions.append(action)
+
+        # 5) Get new observation
+        is_final = (step == max_steps - 1)
+        obs = get_observation_tmaze(env, is_final_step=is_final)
+
+        if done:
+            break
+
+    return EpisodeResult(
+        total_reward=total_reward,
+        n_steps=len(actions),
+        reached_goal=(total_reward > 0),
+        trajectory=trajectory,
+        actions=actions,
+        final_state=env.agent_state,
+        reward_location=env.reward_location,
+    )
 
 
 def run_episode(
@@ -164,41 +278,82 @@ def run_episode(
 def run_experiment(
     config: ExperimentConfig,
     record_planning_for_last: bool = False,
+    strategy: str = "factorized",
 ) -> Tuple[float, float, List[EpisodeResult]]:
-    """Run the full T-maze experiment."""
+    """Run the full T-maze experiment.
+
+    Args:
+        strategy: Planning strategy to use:
+            - "factorized": Factorized VFE (gradient-based, with inference_mode)
+            - "sophisticated": pymdp tree-search (EFE)
+            - "vanilla": pymdp single-step EFE
+    """
     random.seed(config.seed)
-    
+
     transition_tensor, observation_tensor, goal_mapping = create_tmaze_tensors()
-    
+
+    # Build pymdp config if needed
+    pymdp_config = None
+    if strategy in ("sophisticated", "vanilla"):
+        is_sophisticated = (strategy == "sophisticated")
+        pymdp_config = SophisticatedPlanningConfig(
+            planning_horizon=config.max_steps,
+            n_states=5,
+            n_actions=4,
+            n_theta=2,
+            policy_len=1 if is_sophisticated else config.max_steps,
+            inference_horizon=config.max_steps,
+            use_utility=True,
+            use_states_info_gain=True,
+            use_param_info_gain=True,
+            action_selection="deterministic",
+            gamma=16.0,
+            sophisticated=is_sophisticated,
+            include_reward_modality=True,
+            goal_temperature=1.0,
+        )
+
     results = []
-    
-    for episode in tqdm(range(config.n_episodes), desc="Episodes", disable=config.verbose):
+    desc = strategy if strategy != "factorized" else config.inference_mode
+
+    for episode in tqdm(range(config.n_episodes), desc=f"Running {desc} episodes", disable=config.verbose):
         env = TMaze.create(reward_location=None, start_state=1)
-        
+
         if config.verbose:
             print(f"\nEpisode {episode + 1}: Reward at {env.reward_location}")
-        
-        # Record planning for last episode if requested (for visualization)
-        is_last_episode = (episode == config.n_episodes - 1)
-        record_planning = record_planning_for_last and is_last_episode
-        
-        result = run_episode(
-            env=env,
-            transition_tensor=transition_tensor,
-            observation_tensor=observation_tensor,
-            goal_mapping=goal_mapping,
-            config=config,
-            record_planning=record_planning,
-        )
+
+        if strategy in ("sophisticated", "vanilla"):
+            result = run_episode_pymdp(
+                env=env,
+                transition_tensor=transition_tensor,
+                observation_tensor=observation_tensor,
+                goal_mapping=goal_mapping,
+                config=pymdp_config,
+                max_steps=config.max_steps,
+                verbose=config.verbose,
+            )
+        else:
+            # Record planning for last episode if requested (for visualization)
+            is_last_episode = (episode == config.n_episodes - 1)
+            record_planning = record_planning_for_last and is_last_episode
+
+            result = run_episode(
+                env=env,
+                transition_tensor=transition_tensor,
+                observation_tensor=observation_tensor,
+                goal_mapping=goal_mapping,
+                config=config,
+                record_planning=record_planning,
+            )
         results.append(result)
-        
+
         if config.verbose:
             print(f"  Result: reward={result.total_reward}, steps={result.n_steps}, goal={result.reached_goal}")
-    
+
     rewards = [r.total_reward for r in results]
     mean_reward = sum(rewards) / len(rewards)
     success_rate = sum(1 for r in results if r.reached_goal) / len(results)
-    
+
     return mean_reward, success_rate, results
 
 
@@ -331,7 +486,7 @@ def load_params_from_yaml(params_path: Path) -> dict:
     if params_path.exists():
         with open(params_path, 'r') as f:
             params = yaml.safe_load(f)
-        return params.get('experiment', {})
+        return params.get('tmaze', {}).get('experiment', {})
     return {}
 
 
@@ -348,6 +503,9 @@ def main():
     parser.add_argument("--inference-mode", type=str, default="marginal",
                         choices=["marginal", "active", "planning"],
                         help="Inference mode: marginal, active, or planning")
+    parser.add_argument("--strategy", type=str, default="factorized",
+                        choices=["factorized", "sophisticated", "vanilla"],
+                        help="Planning strategy: factorized (VFE), sophisticated (pymdp tree-search), or vanilla (pymdp single-step EFE)")
     parser.add_argument("--output-dir", type=str, default="data",
                         help="Output directory for results and videos")
     parser.add_argument("--no-video", action="store_true",
@@ -358,7 +516,7 @@ def main():
     args = parser.parse_args()
     
     # Load defaults from params.yaml (for DVC pipeline)
-    params_path = script_dir / "params.yaml"
+    params_path = project_root / "params.yaml"
     yaml_params = load_params_from_yaml(params_path)
     
     # Merge: CLI args override yaml params, yaml params override hardcoded defaults
@@ -384,23 +542,29 @@ def main():
         inference_mode=args.inference_mode,
     )
     
-    # Determine inference type for display
-    inference_type_display = {"marginal": "Marginal Inference", "active": "Active Inference", "planning": "Planning Inference"}
-    inference_type = inference_type_display.get(config.inference_mode, config.inference_mode)
-    
+    # Determine display label
+    if args.strategy in ("sophisticated", "vanilla"):
+        inference_type = f"pymdp ({args.strategy})"
+    else:
+        inference_type_display = {"marginal": "Marginal Inference", "active": "Active Inference", "planning": "Planning Inference"}
+        inference_type = inference_type_display.get(config.inference_mode, config.inference_mode)
+
     print("=" * 60)
-    print(f"T-Maze VFE Planning - {inference_type}")
+    print(f"T-Maze Planning - {inference_type}")
     print("=" * 60)
+    print(f"Strategy: {args.strategy}")
     print(f"Episodes: {config.n_episodes}")
     print(f"Max steps: {config.max_steps}")
-    print(f"Planning horizon: {config.planning_horizon}")
-    print(f"Optimization steps: {config.n_optimization_steps}")
+    if args.strategy == "factorized":
+        print(f"Planning horizon: {config.planning_horizon}")
+        print(f"Optimization steps: {config.n_optimization_steps}")
     print("=" * 60)
-    
-    # Always record planning for last episode (for visualization)
+
+    # Always record planning for last episode (for visualization, factorized only)
     mean_reward, success_rate, results = run_experiment(
         config,
-        record_planning_for_last=True,
+        record_planning_for_last=(args.strategy == "factorized"),
+        strategy=args.strategy,
     )
     
     print("\nRESULTS")
@@ -417,11 +581,11 @@ def main():
     print("\n" + "=" * 60)
     print("SAVING RESULTS")
     print("=" * 60)
-    
+
     save_results(config, mean_reward, success_rate, results, output_dir)
-    
-    # Create video of last episode
-    if not args.no_video and results:
+
+    # Create video of last episode (only for factorized strategy which records planning)
+    if not args.no_video and results and args.strategy == "factorized":
         inference_tag = config.inference_mode
         try:
             video_path = create_last_episode_video(
@@ -431,14 +595,14 @@ def main():
         except ImportError as e:
             print(f"Warning: Could not create video - {e}")
             print("Install imageio with: pip install imageio[ffmpeg]")
-    
-    # Create TikZ frames for LaTeX papers (both with and without arrows)
-    if not args.no_tikz and results:
+
+    # Create TikZ frames for LaTeX papers (only for factorized strategy)
+    if not args.no_tikz and results and args.strategy == "factorized":
         frames_dir = create_last_episode_tikz_frames(
             results[-1], output_dir,
         )
         print(f"TikZ frames saved to: {frames_dir}")
-        
+
         # Save reference T-maze figure with legend (only once in data/)
         data_dir = output_dir.parent if output_dir.name in ['marginal', 'active', 'planning'] else output_dir
         tmaze_ref_path = data_dir / "tmaze.tex"

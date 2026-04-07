@@ -21,8 +21,8 @@ from jax.nn import softmax
 from pathlib import Path
 import sys
 
-script_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(script_dir))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 from src.planning import plan_actions_factorized, FactorizedPlanningConfig
 from src.objectives.factorized_vfe import (

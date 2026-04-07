@@ -1,10 +1,10 @@
-# Epistemic Priors in T-Maze (JAX)
+# Epistemic Priors in Active Inference Planning (JAX)
 
-Experiments comparing inference modes for Active Inference planning in a T-Maze environment.
+Experiments comparing inference modes for Active Inference planning via variational free energy (VFE) minimization. Three environments of increasing complexity test whether epistemic priors are necessary for goal-directed exploration.
 
-## Environment
+## Environments
 
-T-shaped maze with 5 states:
+### T-Maze
 
 ```
 State 2 (left arm) --- State 3 (top) --- State 4 (right arm)
@@ -15,38 +15,32 @@ State 2 (left arm) --- State 3 (top) --- State 4 (right arm)
 ```
 
 - Reward at State 2 or State 4 (randomized per episode)
-- Agent starts at State 1
-- Visiting State 0 reveals reward location via observation
+- Agent starts at State 1; visiting State 0 reveals reward location
+- Uses **factorized** VFE with exhaustive sequence enumeration
 
-## Variational Parametrization
+### Epistemic Maze
 
-The joint distribution is **factorized** as:
+A larger grid maze with cue locations and hidden reward, requiring multi-step information gathering before committing to a goal.
 
-```
-q(y_{1:T}, x_{1:T}, u_{1:T}, θ) = q(x|u) q(y,θ|x) q(u)
-```
+- Uses **temporal** (Markovian/Bethe) VFE factorization
 
-Where:
-- `q(u)`: distribution over action sequences — shape `(n_actions^T,)` = `(256,)` for T=4
-- `q(x|u)`: states given actions — shape `(n_states^T, n_actions^T)` = `(625, 256)`
-- `q(y,θ|x)`: observations and reward location given states — shape `(n_obs^T, n_theta, n_states^T)` = `(16, 2, 625)`
+### MiniGrid DoorKey
 
-**Total parameters for T=4**: 256 + 160,000 + 20,000 = **180,256 parameters**, optimized via Adam.
+A `MiniGrid-DoorKey` environment with partial observability (field-of-view), requiring the agent to find a key, unlock a door, and reach a goal.
 
-Entropy decomposes as:
-```
-H[q] = H[q(u)] + E_{q(u)}[H[q(x|u)]] + E_{q(x)}[H[q(y,θ|x)]]
-```
+- Uses **temporal** VFE factorization with a Gymnasium wrapper
 
 ## Inference Modes
 
-Three modes implementing different forms of epistemic priors:
+Three modes implementing different forms of epistemic priors (`--inference-mode`):
 
 | Mode | VFE Components |
 |------|----------------|
-| **marginal** | Standard VFE: `-H[q] + E_q[-log p(u,x,y,θ,goal)]` |
-| **active** | Standard VFE + **Epistemic Priors**:<br>• `p̃(u) ∝ exp(H[q(x\|u)])` — prefer uncertain state outcomes<br>• `p̃(x) ∝ exp(-H[q(y\|x)])` — prefer informative observations<br>• `p̃(y,x) ∝ exp(KL[q(θ\|y,x) ‖ q(θ\|x)])` — prefer belief updates |
-| **planning** | Standard VFE + **Entropy Correction**: `∑_t H[q(x_{t-1}, u_t)] - H[q(x_{t-1})]`<br>Corrects for planning-as-inference structure |
+| **marginal** | Standard VFE: `-H[q] + E_q[-log p(u,x,y,theta,goal)]` |
+| **active** | Standard VFE + **Epistemic Priors** that encourage exploration |
+| **planning** | Standard VFE + **Entropy Correction** for planning-as-inference |
+
+Additionally, **sophisticated** and **vanilla** strategies (via `--strategy`) use pymdp's tree-search planner as baselines.
 
 ## Usage
 
@@ -54,80 +48,82 @@ Three modes implementing different forms of epistemic priors:
 # Install
 uv sync
 
-# Run experiments
-uv run python scripts/tmaze_experiment.py --inference-mode marginal
-uv run python scripts/tmaze_experiment.py --inference-mode active
-uv run python scripts/tmaze_experiment.py --inference-mode planning
-```
+# Run T-Maze experiments
+uv run python scripts/tmaze/experiment.py --inference-mode marginal
+uv run python scripts/tmaze/experiment.py --inference-mode active
+uv run python scripts/tmaze/experiment.py --inference-mode planning
 
-### Options
-   marginal | active | planning (default: marginal)
---n-episodes           Number of episodes (default: from params.yaml: 100)
---max-steps            Max steps per episode (default: from params.yaml: 4)
---planning-horizon     Planning horizon T (default: from params.yaml: 4)
---n-opt-steps          Optimization steps per planning call (default: from params.yaml: 5000)
---learning-rate        Adam learning rate (default: from params.yaml: 0.05)
---seed                 Random seed (default: from params.yaml: 18)
---verbose, -v          Print per-step details
---output-dir           Output directory (default: data/<inference-mode>)
---no-video             Skip video generation
---no-tikz              Skip TikZ frame generation
---no-receding-horizon  Use fixed horizon instead of receding
-```
+# Run Epistemic Maze experiments
+uv run python scripts/epistemic_maze/experiment.py --strategy temporal --inference-mode planning
 
-Note: CLI arguments override values from `params.yaml`.o-video          Skip video generation
---no-receding-horizon  Use fixed horizon instead of receding
-```
-are organized by inference mode in `data/<inference-mode>/`:
+# Run MiniGrid experiments
+uv run python scripts/minigrid/experiment.py
 
-```
-data/
-├── marginal/
-│   ├── results.json           # Full episode data and trajectories
-│   ├── stats.json             # Summary statistics (mean reward, success rate, etc.)
-│   ├── episode.mp4            # Video of last episode with planning visualization
-│   └── frames/                # TikZ frames for LaTeX (frame_XX.tex, frame_XX_arrows.tex)
-├── active/
-│   └── ... (same structure)
-├── planning/
-│   └── ... (same structure)
-├── convergence/               # Convergence analysis results
-├── tmaze.tex                  # Reference T-maze diagram for papers
-└── colors.tex                 # Color scheme definitions
-```
+# Run tests
+uv run python -m pytest tests/ -v
 
-### DVC Pipeline
-
-The project uses DVC for reproducible experiments:
-
-```bash
-# Run all three inference modes
+# Run full DVC pipeline
 dvc repro
-
-# Run specific stage
-dvc repro -s marginal_experiment
-dvc repro -s active_experiment
-dvc repro -s planning_experiment
 ```
-Results saved to `data/`:
-- `results_{mode}_{timestamp}.json` — episode data and summary statistics
-- `episode_{mode}_{timestamp}.mp4` — video of last episode
+
+Experiment parameters live in `params.yaml`; CLI args override them.
 
 ## Structure
 
 ```
-├── scripts/
-│   ├── tmaze_experiment.py    # Main experiment script
-│   └── diagnostics.py         # Diagnostic tools for tuning
-├── src/
-│   ├── environments/
-│   │   └── tmaze.py           # T-Maze environment and tensors
-│   ├── objectives/
-│   │   └── factorized_vfe.py  # VFE with factorized q(x|u)q(y,θ|x)q(u)
-│   ├── planning/
-│   │   └── factorized_optimizer.py  # Adam optimization
-│   └── visualization/
-│       └── tmaze_viz.py       # Video generation
-└── tests/
-    └── test_tmaze.py
+scripts/
+├── tmaze/
+│   ├── experiment.py              # T-Maze experiment runner
+│   ├── convergence_analysis.py    # Convergence and budget sweeps
+│   ├── plot_convergence.py        # Generate convergence figures
+│   └── diagnostics.py             # Diagnostic tools
+├── epistemic_maze/
+│   ├── experiment.py
+│   ├── convergence_analysis.py
+│   ├── plot_convergence.py
+│   └── diagnostics.py
+└── minigrid/
+    ├── experiment.py
+    ├── convergence.py
+    ├── aggregate_episodes.py
+    └── diagnostics.py
+src/
+├── environments/
+│   ├── tmaze.py                   # T-Maze transition/observation tensors
+│   ├── epistemic_maze.py          # Epistemic Maze environment
+│   ├── minigrid.py                # MiniGrid wrapper
+│   └── environment_protocol.py    # Shared environment protocol
+├── objectives/
+│   ├── factorized_vfe.py          # Factorized VFE (T-Maze)
+│   └── temporal_vfe.py            # Temporal/Bethe VFE (Epistemic Maze, MiniGrid)
+├── planning/
+│   ├── factorized_optimizer.py    # Adam optimizer for factorized VFE
+│   ├── temporal_optimizer.py      # Adam optimizer for temporal VFE
+│   ├── temporal_optimizer_minigrid.py
+│   └── sophisticated_planner.py   # pymdp tree-search baseline
+├── distributions/
+│   └── entropy.py                 # Entropy and KL utilities
+└── visualization/
+    └── tmaze_viz.py               # Video generation
+data/                              # DVC-tracked results
+├── tmaze/{marginal,active,planning,sophisticated,vanilla}/
+├── epistemic_maze/{marginal,active,planning,sophisticated,vanilla}/
+└── minigrid/
+tests/
+├── test_tmaze.py
+├── test_temporal_vfe_regression.py
+└── test_minigrid_fov.py
 ```
+
+## DVC Pipeline
+
+```bash
+# Run all experiments and convergence analyses
+dvc repro
+
+# Run specific stages
+dvc repro -s tmaze_experiment_marginal
+dvc repro -s epistemic_planning
+```
+
+See `dvc.yaml` for the full pipeline definition.

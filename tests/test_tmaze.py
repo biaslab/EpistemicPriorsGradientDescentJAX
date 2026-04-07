@@ -9,6 +9,11 @@ sys.path.insert(0, str(__file__).rsplit('/', 2)[0])
 from src.environments import TMaze, create_tmaze_tensors
 from src.distributions import categorical_entropy, categorical_kl
 from src.planning import plan_actions_factorized, FactorizedPlanningConfig
+from src.planning import (
+    convert_tmaze_tensors_to_pymdp,
+    SophisticatedPlanningConfig,
+    SophisticatedPlanner,
+)
 
 
 class TestTMazeEnvironment:
@@ -161,6 +166,106 @@ class TestPlanning:
         # Should prefer North (0) to go toward goal
         # (North goes to top-middle, then West to top-left)
         assert result.first_action_probs[0] > 0.3  # North should have significant prob
+
+
+class TestTMazePymdp:
+    """Tests for pymdp integration with T-Maze."""
+
+    def test_convert_tmaze_tensors_shapes(self):
+        """Test A/B/C/D have correct shapes."""
+        transition, obs, goal = create_tmaze_tensors()
+        theta_prior = jnp.array([0.5, 0.5])
+        A, B, C, D = convert_tmaze_tensors_to_pymdp(
+            transition, obs, goal, theta_prior,
+        )
+        assert A[0].shape == (5, 5, 2)  # location obs
+        assert A[1].shape == (2, 5, 2)  # cue obs
+        assert A[2].shape == (3, 5, 2)  # reward obs
+        assert B[0].shape == (5, 5, 4)  # location transitions
+        assert B[1].shape == (2, 2, 1)  # theta identity
+        assert C[0].shape == (5,)
+        assert C[1].shape == (2,)
+        assert C[2].shape == (3,)
+        assert D[0].shape == (5,)
+        assert D[1].shape == (2,)
+
+    def test_a_matrix_location_identity(self):
+        """Test A[0] is identity-like for locations."""
+        import numpy as np
+        transition, obs, goal = create_tmaze_tensors()
+        theta_prior = jnp.array([0.5, 0.5])
+        A, _, _, _ = convert_tmaze_tensors_to_pymdp(
+            transition, obs, goal, theta_prior,
+        )
+        for theta_idx in range(2):
+            assert np.allclose(A[0][:, :, theta_idx], np.eye(5))
+
+    def test_a_matrix_cue_matches_reward_obs(self):
+        """Test A[1] matches the original reward_obs_tensor."""
+        import numpy as np
+        transition, obs, goal = create_tmaze_tensors()
+        theta_prior = jnp.array([0.5, 0.5])
+        A, _, _, _ = convert_tmaze_tensors_to_pymdp(
+            transition, obs, goal, theta_prior,
+        )
+        assert np.allclose(A[1], np.array(obs))
+
+    def test_a_matrix_reward_structure(self):
+        """Test A[2] encodes correct/wrong goal at goal states."""
+        import numpy as np
+        transition, obs, goal = create_tmaze_tensors()
+        theta_prior = jnp.array([0.5, 0.5])
+        A, _, _, _ = convert_tmaze_tensors_to_pymdp(
+            transition, obs, goal, theta_prior,
+        )
+        # TOP_LEFT (s=2), theta=0 (left) -> correct (idx 1)
+        assert A[2][1, 2, 0] == 1.0
+        # TOP_LEFT (s=2), theta=1 (right) -> wrong (idx 2)
+        assert A[2][2, 2, 1] == 1.0
+        # TOP_RIGHT (s=4), theta=1 (right) -> correct (idx 1)
+        assert A[2][1, 4, 1] == 1.0
+        # TOP_RIGHT (s=4), theta=0 (left) -> wrong (idx 2)
+        assert A[2][2, 4, 0] == 1.0
+        # MIDDLE (s=1) -> always no_reward (idx 0)
+        assert A[2][0, 1, 0] == 1.0
+        assert A[2][0, 1, 1] == 1.0
+
+    def test_pymdp_episode_smoke(self):
+        """Smoke test: run a full pymdp episode without errors."""
+        import random
+        random.seed(42)
+
+        transition, obs, goal = create_tmaze_tensors()
+        theta_prior = jnp.array([0.5, 0.5])
+        A, B, C, D = convert_tmaze_tensors_to_pymdp(
+            transition, obs, goal, theta_prior,
+        )
+
+        config = SophisticatedPlanningConfig(
+            planning_horizon=4,
+            n_states=5,
+            n_actions=4,
+            n_theta=2,
+            policy_len=1,
+            inference_horizon=4,
+            use_utility=True,
+            use_states_info_gain=True,
+            use_param_info_gain=True,
+            action_selection="deterministic",
+            gamma=16.0,
+            sophisticated=True,
+        )
+
+        planner = SophisticatedPlanner.from_pymdp_arrays(A, B, C, D, config)
+        planner.agent.reset()
+
+        # Simulate one step: observe location=1 (MIDDLE), ambiguous cue, no reward
+        obs_indices = [1, 0, None]
+        planner.infer_states(obs_indices)
+        q_pi, efe = planner.infer_policies()
+        action_arr = planner.sample_action()
+
+        assert 0 <= int(action_arr[0]) < 4
 
 
 if __name__ == "__main__":
